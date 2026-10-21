@@ -18,7 +18,7 @@ function PersonForm({ person, subteams, onClose, onSaved }) {
     if (res) onSaved()
   }
   const toggleActive = async () => {
-    if (person.is_active && !window.confirm(`Remove ${person.name} from the team? They lose access immediately. Their tasks stay, unassigned from nobody — reassign them.`)) return
+    if (person.is_active && !window.confirm(`Remove ${person.name} from the team? They lose access on their next click. Their tasks stay assigned to them, so reassign those from the boards.`)) return
     if (await run(() => patch(`/users/${person.id}`, { is_active: !person.is_active }), person.is_active ? 'Removed.' : 'Reactivated.')) onSaved()
   }
   return (
