@@ -1,0 +1,35 @@
+name = "frc302-hub"
+main = "worker/src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = false
+
+# The React build, served for every path the worker doesn't answer. /api/* always reaches the
+# worker first; any other unknown path gets index.html so client-side routes deep-link.
+[assets]
+directory = "frontend/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "frc302-hub-db"
+# Replace with the id printed by: npx wrangler d1 create frc302-hub-db
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[vars]
+ENVIRONMENT = "production"
+TEAM_NAME = "FRC Team 302"
+# The deployed app's origin (e.g. https://hub.team302.org). Clerk tokens minted on any other
+# origin are refused.
+APP_URL = ""
+
+# Secrets — set with `npx wrangler secret put <NAME>`, never in this file:
+#   CLERK_PUBLISHABLE_KEY   pk_live_… (also handed to the browser)
+#   CLERK_JWT_KEY           Clerk → API keys → JWT public key (PEM)
+#   BOOTSTRAP_ADMIN_EMAIL   the first mentor; only works while the team has no admin
+#   VAULT_KEY               base64 of 32 random bytes (see worker/src/lib/vaultCrypto.js)
+#   VAULT_KEY_PREVIOUS      only while rotating VAULT_KEY
+
+# `wrangler dev` reads .dev.vars (see .dev.vars.example), which overrides [vars] locally.

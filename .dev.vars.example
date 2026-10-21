@@ -1,0 +1,6 @@
+# Copy to .dev.vars for `npm run dev`. Never commit .dev.vars.
+ENVIRONMENT=development
+DEV_LOGIN=on
+JWT_SECRET=change-me-to-at-least-32-random-characters
+BOOTSTRAP_ADMIN_EMAIL=mentor@example.org
+VAULT_KEY=
