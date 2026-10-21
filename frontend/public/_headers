@@ -1,0 +1,10 @@
+# Security headers for the app shell and assets (Workers Assets reads this from dist/).
+# Sign-in is Clerk's widget. A production Clerk instance serves it from clerk.<your domain>:
+# ADD THAT HOST to script-src and connect-src below before going live, or sign-in will not load.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://*.clerk.accounts.dev https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://img.clerk.com; font-src 'self' data:; connect-src 'self' https://*.clerk.accounts.dev; frame-src https://challenges.cloudflare.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains

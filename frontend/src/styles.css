@@ -1,0 +1,172 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { @apply font-sans; font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; font-variant-numeric: tabular-nums; font-feature-settings: 'cv11', 'ss01'; color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  body { @apply bg-canvas text-brand-black; min-height: 100vh; }
+  ::selection { @apply bg-accent-200 text-brand-black; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-brand-gray-300; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-brand-gray-400; background-clip: padding-box; border: 2px solid transparent; }
+
+  /* ── Liquid glass ──────────────────────────────────────────────────────────
+     The app sits on an ambient backdrop (a few soft colour fields, fixed, behind everything) so
+     the translucent surfaces above it have something to refract. Surfaces (.glass, .card,
+     .menu-pop, and the sidebar, topbar and modals, which use .glass) are a tinted translucent
+     fill, a background blur with extra saturation, a hairline border and a specular top edge.
+     Dark is the default theme; light is frosted white over a pale backdrop. */
+  :root {
+    --glass-fill: 255 255 255 / 0.62;
+    --glass-fill-strong: 255 255 255 / 0.82;
+    --glass-border: 15 15 15 / 0.08;
+    --glass-highlight: 255 255 255 / 0.9;
+    --glass-shadow: 0 1px 2px rgb(16 24 40 / 0.04), 0 8px 24px -12px rgb(16 24 40 / 0.12);
+    --glass-blur: 24px;
+    --glass-sheen: 255 255 255 / 0.55;
+    --glass-shade: 15 15 15 / 0.03;
+    --backdrop-a: 18 164 100 / 0.10;
+    --backdrop-b: 161 161 170 / 0.08;
+    --backdrop-c: 245 179 1 / 0.05;
+  }
+  .dark {
+    --glass-fill: 255 255 255 / 0.03;
+    --glass-fill-strong: 22 22 24 / 0.78;
+    --glass-border: 255 255 255 / 0.09;
+    --glass-highlight: 255 255 255 / 0.09;
+    --glass-shadow: 0 1px 1px rgb(0 0 0 / 0.5), 0 16px 40px -16px rgb(0 0 0 / 0.8);
+    --glass-sheen: 255 255 255 / 0.035;
+    --glass-shade: 0 0 0 / 0.3;
+    --backdrop-a: 31 179 109 / 0.12;
+    --backdrop-b: 18 164 100 / 0.05;
+    --backdrop-c: 245 179 1 / 0.04;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(60vw 50vh at 12% 8%, rgb(var(--backdrop-a)), transparent 70%),
+      radial-gradient(50vw 45vh at 92% 18%, rgb(var(--backdrop-b)), transparent 70%),
+      radial-gradient(70vw 50vh at 60% 100%, rgb(var(--backdrop-c)), transparent 70%);
+  }
+
+  /* Keyboard-only focus ring: visible accent outline for tab/keyboard users,
+     suppressed for mouse clicks (:focus-visible). */
+  :focus-visible { outline: 2px solid rgb(var(--accent-500)); outline-offset: 2px; border-radius: 4px; }
+  /* Don't double up when a control already draws its own focus ring (.input). */
+  .input:focus-visible { outline: none; }
+}
+
+@layer components {
+  /* ── Glass surfaces ────────────────────────────────────────────────────── */
+  .glass {
+    background-color: rgb(var(--glass-fill));
+    border-color: rgb(var(--glass-border));
+    /* The liquid part: light pooling under the top edge, falling off by a third of the way down. */
+    background-image: linear-gradient(180deg, rgb(var(--glass-sheen)) 0%, transparent 38%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(170%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(170%);
+    /* A bright specular top edge, a darker lower edge, then the drop shadow. */
+    box-shadow: inset 0 1px 0 0 rgb(var(--glass-highlight)), inset 0 -1px 0 0 rgb(var(--glass-shade)), var(--glass-shadow);
+  }
+  /* Floating layers (menus, popovers, modals) sit over busy content, so they are more opaque. */
+  .glass-strong { @apply glass; background-color: rgb(var(--glass-fill-strong)); }
+
+  /* ── Buttons ───────────────────────────────────────────────────────────── */
+  .btn { @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-control select-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+         transition: background-color 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out, box-shadow 150ms ease-out, transform 120ms ease-out; }
+  .btn:active:not(:disabled) { transform: scale(0.98); }
+  /* Primary is ink: black on light paper, white on the dark canvas (as Resend). */
+  .btn-primary   { @apply btn bg-brand-black text-white hover:bg-brand-gray-800 active:bg-brand-gray-700;
+                   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.12), inset 0 1px 0 0 rgb(255 255 255 / 0.14); }
+  .btn-secondary { @apply btn glass text-brand-black border hover:border-brand-gray-300; }
+  .btn-secondary:hover { background-color: rgb(var(--brand-gray-100) / 0.7); }
+  .btn-ghost     { @apply btn bg-transparent text-brand-gray-600 hover:bg-brand-gray-100 hover:text-brand-black; }
+  .btn-danger    { @apply btn bg-status-danger text-white hover:bg-red-700 shadow-card; }
+  .btn-sm        { @apply px-3 py-1.5 text-xs; }
+  .btn-lg        { @apply px-6 py-3 text-base; }
+  /* Round icon-only button (Topbar cluster, toolbars). */
+  .btn-icon      { @apply inline-flex items-center justify-center w-8 h-8 rounded-full text-brand-gray-500 hover:text-brand-black hover:bg-brand-gray-100 transition-colors duration-150; }
+
+  /* ── Form controls ─────────────────────────────────────────────────────── */
+  .input { @apply w-full px-3 py-2 text-sm bg-white/70 border border-brand-gray-200 rounded-control outline-none placeholder:text-brand-gray-400 hover:border-brand-gray-300 focus:border-accent-500 focus:ring-[3px] focus:ring-accent-500/15 disabled:bg-brand-gray-50 disabled:cursor-not-allowed;
+           transition: border-color 150ms ease-out, box-shadow 150ms ease-out; }
+  .input-error { @apply border-status-danger focus:border-status-danger focus:ring-status-danger/15; }
+  .label { @apply block text-xs font-medium text-brand-gray-600 mb-1.5; }
+  .link  { @apply text-accent-600 hover:text-accent-700 font-medium transition-colors; }
+
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
+  .card        { @apply glass border rounded-card;
+                 transition: box-shadow 180ms ease-out, border-color 180ms ease-out, transform 180ms cubic-bezier(0.22, 1, 0.36, 1); }
+  .card-padded { @apply card p-6; }
+  /* Clickable cards: soft shadow on hover. Only explicit opt-ins (.card-interactive,
+     link cards) lift 1px — a transform would re-anchor fixed-position modals
+     rendered inside an arbitrary card. */
+  .card.cursor-pointer:hover, a.card:hover, .card-interactive:hover { @apply border-brand-gray-300; }
+  a.card:hover, .card-interactive:hover { transform: translateY(-1px); }
+  .card-interactive { @apply cursor-pointer; }
+  .menu-pop { @apply glass-strong border rounded-xl py-1 z-50 animate-slide-down; }
+
+  /* ── Badges (soft pills) ───────────────────────────────────────────────── */
+  .badge         { @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap leading-4 ring-1 ring-inset; }
+  .badge-gray    { @apply badge bg-brand-gray-100 text-brand-gray-700 ring-brand-gray-200/70; }
+  .badge-black   { @apply badge bg-brand-gray-900 text-white ring-brand-gray-900; }
+  .badge-success { @apply badge bg-green-50 text-green-700 ring-green-600/15; }
+  .badge-warning { @apply badge bg-amber-50 text-amber-700 ring-amber-600/20; }
+  .badge-danger  { @apply badge bg-red-50 text-red-700 ring-red-600/15; }
+  .badge-info    { @apply badge bg-blue-50 text-blue-700 ring-blue-600/15; }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table         { @apply w-full text-sm; }
+  .table th      { @apply text-left text-xs font-medium text-brand-gray-500 px-4 py-2.5 border-b border-brand-gray-200 whitespace-nowrap; }
+  .table td      { @apply px-4 py-3 border-b border-brand-gray-100 text-brand-gray-800; }
+  .table tr:last-child td { @apply border-b-0; }
+  .table tbody tr { @apply hover:bg-brand-gray-50/80 transition-colors duration-100; }
+
+  /* ── Page chrome ───────────────────────────────────────────────────────── */
+  .page-header   { @apply flex flex-wrap items-end justify-between gap-3 mb-6; }
+  .page-title    { @apply text-[1.75rem] leading-[2.125rem] font-semibold tracking-[-0.02em] text-brand-black; }
+  .page-subtitle { @apply text-sm text-brand-gray-500 mt-1; }
+  .section-title { @apply text-lg font-semibold tracking-[-0.01em] text-brand-black; }
+  .divider       { @apply border-t border-brand-gray-200 my-4; }
+  .empty-state       { @apply flex flex-col items-center justify-center py-16 text-center; }
+  .empty-state-icon  { @apply w-12 h-12 text-brand-gray-300 mb-4; }
+  .empty-state-title { @apply text-base font-semibold text-brand-gray-800 mb-1; }
+  .empty-state-body  { @apply text-sm text-brand-gray-500 mb-6 max-w-sm; }
+
+  /* Shimmer skeleton fill. */
+  .skeleton { background: linear-gradient(90deg, rgb(var(--brand-gray-100)) 0%, rgb(var(--brand-gray-200)) 40%, rgb(var(--brand-gray-100)) 80%); background-size: 200% 100%; @apply animate-shimmer; }
+}
+
+/* ── Reduced motion: no movement, instant state changes. Spinners keep
+   rotating (they communicate progress, not decoration). ───────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin), *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn:active:not(:disabled), a.card:hover, .card-interactive:hover { transform: none !important; }
+}
+
+/* ── Accessibility and support fallbacks for glass ─────────────────────────
+   Someone who asked the OS for less transparency, or a browser without backdrop-filter,
+   gets solid surfaces in the same colours. */
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .glass-strong, .card, .menu-pop, .btn-secondary { background-color: rgb(var(--white)) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  body::before { display: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass, .glass-strong, .card, .menu-pop, .btn-secondary { background-color: rgb(var(--white)) !important; }
+}
+
+@media print {
+  body::before { display: none !important; }
+  [data-app-chrome], .fixed, .print\:hidden { display: none !important; }
+  .glass, .glass-strong, .card { background: white !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; box-shadow: none !important; }
+  main { padding: 0 !important; overflow: visible !important; }
+}
