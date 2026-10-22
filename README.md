@@ -56,7 +56,10 @@ for lettering, travel eligibility and grant reports. Filter by date range and su
 their own hours on Home.
 
 **Season.** Kickoff, competitions, deadlines and outreach days with a countdown on everyone's Home; they're in the
-calendar feed too.
+calendar feed too. With a Blue Alliance key, **Import from TBA** adds every event the team is registered for (run it
+again to pick up date or venue changes; a competition you'd already typed in is linked, not duplicated), and during an
+event Home shows **rank, qual record, alliance, and the next and last match** with partners, opponents and the
+predicted start time, refreshed every minute. The team number is `TEAM_NUMBER` in `wrangler.toml`.
 
 **Workload** (leads and mentors). Open, overdue, due-this-week and stuck tasks per person across every board, with
 who has nothing assigned.
@@ -202,6 +205,7 @@ build time on your machine and none of it ships to the browser. The fix is a Tai
    npx wrangler secret put VAPID_PUBLIC_KEY
    npx wrangler secret put VAPID_PRIVATE_KEY
    npx wrangler secret put VAPID_SUBJECT          # mailto:you@team302.org (push services' contact)
+   npx wrangler secret put TBA_API_KEY            # optional: thebluealliance.com/account → Read API key
    ```
    **Back up `VAULT_KEY` somewhere outside Cloudflare.** If it's lost, every stored password is unrecoverable.
 5. `npm run deploy` runs the tests, builds the app, migrates D1 and deploys.

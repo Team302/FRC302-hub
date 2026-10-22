@@ -2,7 +2,8 @@
 // mentors manage them.
 import { requireRole } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
-import { badRequest, json, newId, notFound, readBody } from '../lib/http.js'
+import { badRequest, conflict, json, newId, notFound, readBody } from '../lib/http.js'
+import { eventFromTba, EVENT_KEY, liveStatus, tba, tbaConfigured, teamNumber } from '../lib/tba.js'
 import * as v from '../lib/validate.js'
 
 export const EVENT_KINDS = ['kickoff', 'competition', 'deadline', 'outreach', 'other']
@@ -30,7 +31,44 @@ export function eventRoutes(router, authed) {
     const { results } = await env.DB.prepare(
       `SELECT * FROM events ${all ? '' : "WHERE ends_on >= date('now')"} ORDER BY starts_on LIMIT 200`
     ).all()
-    return json({ events: results })
+    return json({ events: results, tba: { configured: tbaConfigured(env), team: teamNumber(env) } })
+  }))
+
+  // Adds (or refreshes) every event the team is registered for in a season. Events already
+  // imported are updated in place (name, dates, place); their type, notes and link are left alone.
+  // A competition someone typed in by hand on the same start date is linked, not duplicated.
+  router.post('/api/events/import-tba', authed(async (request, env, user) => {
+    requireRole(user, 'lead')
+    const body = await readBody(request)
+    const year = v.int(body.year, 'Season', { min: 1992, max: new Date().getUTCFullYear() + 1 }) ?? new Date().getUTCFullYear()
+    const list = await tba(env, `/team/frc${teamNumber(env)}/events/${year}/simple`)
+    let created = 0
+    let updated = 0
+    for (const raw of list || []) {
+      if (!EVENT_KEY.test(raw.key || '') || !/^\d{4}-\d{2}-\d{2}$/.test(raw.start_date || '')) continue
+      const e = eventFromTba(raw)
+      const existing = await env.DB.prepare('SELECT id FROM events WHERE tba_key = ?').bind(e.tba_key).first()
+        || await env.DB.prepare("SELECT id FROM events WHERE tba_key IS NULL AND kind = 'competition' AND starts_on = ?").bind(e.starts_on).first()
+      if (existing) {
+        await env.DB.prepare('UPDATE events SET tba_key = ?, name = ?, starts_on = ?, ends_on = ?, location = ? WHERE id = ?')
+          .bind(e.tba_key, e.name, e.starts_on, e.ends_on, e.location, existing.id).run()
+        updated++
+      } else {
+        await env.DB.prepare('INSERT INTO events (id, name, kind, starts_on, ends_on, location, url, notes, created_by, tba_key) VALUES (?, ?, ?, ?, ?, ?, ?, \'\', ?, ?)')
+          .bind(newId('evt'), e.name, e.kind, e.starts_on, e.ends_on, e.location, e.url, user.id, e.tba_key).run()
+        created++
+      }
+    }
+    await logActivity(env, request, user, { action: 'event.import', entity: 'event', entityId: null, summary: `Imported ${year} events from The Blue Alliance (${created} new, ${updated} updated)` })
+    return json({ year, created, updated, found: (list || []).length })
+  }))
+
+  // Rank, record and next match while the team is at an imported competition.
+  router.get('/api/events/:id/live', authed(async (request, env) => {
+    const event = await env.DB.prepare('SELECT * FROM events WHERE id = ?').bind(request.params.id).first()
+    if (!event) throw notFound('That event')
+    if (!event.tba_key) throw conflict('This event isn’t linked to The Blue Alliance.', 'not_linked')
+    return json({ live: await liveStatus(env, event.tba_key) })
   }))
 
   router.post('/api/events', authed(async (request, env, user) => {

@@ -13,6 +13,7 @@ import { Stagger } from '../components/ui/Motion'
 import { SkeletonTable } from '../components/ui/Skeleton'
 import { StatusPill } from '../components/board/cells'
 import { countdown, daysUntil, EVENT_KIND } from './Season'
+import LiveCompetition from '../components/LiveCompetition'
 import SetupChecklist from '../components/SetupChecklist'
 
 export function DueText({ due, done }) {
@@ -52,9 +53,13 @@ export default function Home() {
         </Link>
       )}
 
-      {data && atLeast(user, 'admin') && <SetupChecklist upcomingMeetings={data.meetings.length} />}
-
-      {nextEvent && (
+      {nextEvent && nextEvent.tba_key && daysUntil(nextEvent.starts_on) <= 0 ? (
+        <section className="card px-5 py-4 mb-6 relative overflow-hidden">
+          <span className="absolute inset-y-0 left-0 w-1 bg-flame-500" aria-hidden="true" />
+          <Link to="/season" className="flex items-center gap-2 mb-3 text-sm"><Trophy className="w-4 h-4 text-flame-500" /><span className="font-medium">{nextEvent.name}</span><span className="text-brand-gray-500">happening now</span></Link>
+          <LiveCompetition event={nextEvent} />
+        </section>
+      ) : nextEvent && (
         <Link to="/season" className="card flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3.5 mb-6 relative overflow-hidden">
           <span className="absolute inset-y-0 left-0 w-1 bg-flame-500" aria-hidden="true" />
           <Trophy className="w-4 h-4 text-flame-500" />
@@ -63,6 +68,8 @@ export default function Home() {
           {daysUntil(nextEvent.starts_on) > 0 && <span className="text-2xl font-semibold tabular-nums">{daysUntil(nextEvent.starts_on)}<span className="text-xs font-normal text-brand-gray-500 ml-1">days</span></span>}
         </Link>
       )}
+
+      {data && atLeast(user, 'admin') && <SetupChecklist upcomingMeetings={data.meetings.length} />}
 
       {!data ? <div className="card"><SkeletonTable rows={6} cols={4} /></div> : (
         <>

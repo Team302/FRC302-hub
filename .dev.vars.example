@@ -7,3 +7,6 @@ VAULT_KEY=
 # Web Push (optional locally; npm run dev fills these in automatically if missing)
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
+# The Blue Alliance (optional): a free read key from https://www.thebluealliance.com/account
+# turns on Season → Import from TBA and live rank / next match on Home during competitions.
+TBA_API_KEY=

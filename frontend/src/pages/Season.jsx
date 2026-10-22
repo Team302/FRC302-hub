@@ -1,8 +1,9 @@
 // The season at a glance: kickoff, competitions, deadlines and outreach days, with countdowns.
 import { useEffect, useState } from 'react'
-import { CalendarRange, ExternalLink, MapPin, Pencil, Plus, Trash2, Trophy } from 'lucide-react'
+import { CalendarRange, CloudDownload, ExternalLink, MapPin, Pencil, Plus, Trash2, Trophy } from 'lucide-react'
 import { del, get, patch, post } from '../lib/api'
 import { useSession } from '../context/Session'
+import { useToast } from '../context/ToastContext'
 import { atLeast } from '../lib/constants'
 import useRun from '../lib/useRun'
 import EmptyState from '../components/ui/EmptyState'
@@ -10,6 +11,7 @@ import FilterChips from '../components/ui/FilterChips'
 import Modal from '../components/ui/Modal'
 import PageHeader from '../components/ui/PageHeader'
 import { SkeletonTable } from '../components/ui/Skeleton'
+import LiveCompetition from '../components/LiveCompetition'
 import Field from '../components/forms/Field'
 import { useConfirm } from '../components/list/useConfirm'
 
@@ -66,15 +68,41 @@ function EventForm({ event, onClose, onSaved }) {
   )
 }
 
+// FRC seasons are named for the year of kickoff (January), so from late summer on the next one is
+// the one being planned.
+const defaultSeason = () => { const d = new Date(); return d.getMonth() >= 7 ? d.getFullYear() + 1 : d.getFullYear() }
+
+function ImportTba({ team, onClose, onDone }) {
+  const [year, setYear] = useState(defaultSeason())
+  const run = useRun()
+  const submit = async (e) => {
+    e.preventDefault()
+    const res = await run(() => post('/events/import-tba', { year: Number(year) }))
+    if (res) onDone(res)
+  }
+  return (
+    <Modal open onClose={onClose} title="Import from The Blue Alliance" size="sm"
+      footer={<><button type="button" className="btn-ghost" onClick={onClose}>Cancel</button><button className="btn-primary" form="tba-form">Import</button></>}>
+      <form id="tba-form" onSubmit={submit} className="space-y-4">
+        <p className="text-sm text-brand-gray-600">Adds every event Team {team} is registered for. Running it again updates names, dates and places; your notes and links stay. During an event, Home shows rank and the next match.</p>
+        <Field label="Season"><input type="number" className="input" min={1992} max={new Date().getFullYear() + 1} value={year} onChange={(e) => setYear(e.target.value)} required /></Field>
+      </form>
+    </Modal>
+  )
+}
+
 export default function Season() {
   const { user } = useSession()
   const [scope, setScope] = useState('upcoming')
   const [events, setEvents] = useState(null)
   const [editing, setEditing] = useState(null)
+  const [tba, setTba] = useState(null)
+  const [importing, setImporting] = useState(false)
   const run = useRun()
+  const { success } = useToast()
   const [confirm, confirmDialog] = useConfirm()
   const canManage = atLeast(user, 'lead')
-  const load = () => get(`/events${scope === 'all' ? '?scope=all' : ''}`).then((d) => setEvents(d.events))
+  const load = () => get(`/events${scope === 'all' ? '?scope=all' : ''}`).then((d) => { setEvents(d.events); setTba(d.tba) })
   useEffect(() => { setEvents(null); load() }, [scope]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const next = events?.find((e) => daysUntil(e.ends_on) >= 0)
@@ -82,7 +110,12 @@ export default function Season() {
     <div>
       {confirmDialog}
       <PageHeader title="Season" subtitle="Kickoff, competitions, deadlines and outreach days. They’re in everyone’s calendar feed too."
-        actions={canManage && <button type="button" className="btn-primary" onClick={() => setEditing('new')}><Plus className="w-4 h-4" />Add event</button>} />
+        actions={canManage && (
+          <div className="flex gap-2">
+            {tba?.configured && <button type="button" className="btn-secondary" onClick={() => setImporting(true)}><CloudDownload className="w-4 h-4" />Import from TBA</button>}
+            <button type="button" className="btn-primary" onClick={() => setEditing('new')}><Plus className="w-4 h-4" />Add event</button>
+          </div>
+        )} />
       {next && (
         <div className="card p-6 mb-6 flex flex-wrap items-center gap-6 overflow-hidden relative">
           <div className="absolute inset-0 pointer-events-none opacity-60" style={{ background: 'radial-gradient(60% 120% at 0% 0%, rgb(var(--accent-500) / 0.18), transparent 60%), radial-gradient(40% 120% at 100% 100%, rgb(var(--flame-500) / 0.14), transparent 60%)' }} />
@@ -99,6 +132,7 @@ export default function Season() {
               </>
             ) : <p className="text-2xl font-semibold text-accent-600">Happening now</p>}
           </div>
+          {next.tba_key && daysUntil(next.starts_on) <= 0 && <div className="relative basis-full border-t border-brand-gray-200 pt-4"><LiveCompetition event={next} /></div>}
         </div>
       )}
       <FilterChips className="mb-4" aria-label="Show" value={scope} onChange={setScope} options={[{ key: 'upcoming', label: 'Upcoming' }, { key: 'all', label: 'Whole season' }]} />
@@ -138,6 +172,7 @@ export default function Season() {
           })}
         </ul>
       )}
+      {importing && <ImportTba team={tba.team} onClose={() => setImporting(false)} onDone={(r) => { setImporting(false); setScope('all'); load(); success(r.found ? `${r.created} added, ${r.updated} updated` : `No ${r.year} events for Team ${tba.team} on The Blue Alliance yet`) }} />}
       {editing && <EventForm event={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
     </div>
   )
