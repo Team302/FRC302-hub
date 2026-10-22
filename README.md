@@ -157,8 +157,11 @@ Members can't see other people's emails. If your district has a data-privacy agr
   people following along. Two people editing the same cell at once: the last save wins.
 - **One owner per task.** The built-in Owner is single on purpose (one person accountable); add a People column for
   helpers. Subitems are one level deep.
-- **Logo.** Put the team logo at `frontend/public/brand/logo.svg` (or `logo.png`, transparent background). The sign-in page
-  shows it; small spots use the "302" mark. The brand colours are in `frontend/tailwind.config.js` (`ACCENT`, `FLAME`).
+- **Logo.** The team logo is in `frontend/public/brand/` with a dark-theme version (outlines and lettering turned
+  white), the dragon-head mark used in small spots, the app icons, favicon and notification badge. All of them come
+  from one file: to change the logo, run `python3 scripts/brand-assets.py path/to/logo.png` (PNG with a transparent
+  background; needs Pillow). The head crop is set for the current artwork, so check the output if the artwork changes.
+  The brand colours are in `frontend/tailwind.config.js` (`ACCENT`, `FLAME`).
 
 ## Local development
 

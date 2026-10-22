@@ -1,43 +1,42 @@
-// Team 302 brand.
+// Team 302 brand, from the team logo (public/brand/, built by scripts/brand-assets.py).
 //
-// BrandMark: the compact mark for small spots (sidebar tile, favicon-sized places): a dragon-green
-// tile with "302" set the way the logo sets it, heavy and italic.
+// BrandMark: the dragon's head on a rounded tile, for small spots (sidebar, loader, phone header).
 //   size      - 'sm' (28px) | 'md' (40px, default) | 'lg' (56px)
+//   tone      - 'auto' (follows the theme, default) | 'light' | 'dark' (for always-dark panels)
 //   label     - accessible name (role="img"). Omit when a visible wordmark sits next to the mark.
 //
-// TeamLogo: the full Lake Orion Robotics logo (dragon + 302) where there is room for it. It reads
-// public/brand/logo.svg, then logo.png. If neither is in the build it renders `fallback`.
+// TeamLogo: the full logo (dragon, 302, Lake Orion Robotics). The dark version has the black
+// outlines and lettering turned white so it reads on dark backgrounds.
 //   height    - pixel height (width follows the image)
-//   fallback  - node to show without a logo file (default: nothing)
-import { useState } from 'react'
-
+//   tone      - as above
 const SIZES = {
-  sm: { tile: 'w-7 h-7 rounded-lg', text: 'text-[11px]' },
-  md: { tile: 'w-10 h-10 rounded-[10px]', text: 'text-[15px]' },
-  lg: { tile: 'w-14 h-14 rounded-[14px]', text: 'text-xl' },
+  sm: 'w-7 h-7 rounded-lg',
+  md: 'w-10 h-10 rounded-[10px]',
+  lg: 'w-14 h-14 rounded-[14px]',
 }
-const TILE_SHADOW = '0 1px 2px rgb(16 24 40 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.18)'
 
-export default function BrandMark({ size = 'md', label, className = '' }) {
-  const s = SIZES[size] || SIZES.md
-  const a11y = label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true }
+// Two images, one per theme, so the right one shows without waiting on JavaScript.
+function Themed({ light, dark, tone, className, style, alt = '' }) {
+  if (tone === 'light') return <img src={light} alt={alt} className={className} style={style} draggable="false" />
+  if (tone === 'dark') return <img src={dark} alt={alt} className={className} style={style} draggable="false" />
   return (
-    <span {...a11y} style={{ boxShadow: TILE_SHADOW }}
-      className={`inline-grid shrink-0 place-items-center bg-gradient-to-br from-accent-500 to-accent-700 text-white font-black italic tracking-[-0.06em] select-none ${s.tile} ${s.text} ${className}`}>
-      302
+    <>
+      <img src={light} alt={alt} className={`dark:hidden ${className}`} style={style} draggable="false" />
+      <img src={dark} alt={alt} className={`hidden dark:block ${className}`} style={style} draggable="false" />
+    </>
+  )
+}
+
+export default function BrandMark({ size = 'md', tone = 'auto', label, className = '' }) {
+  const a11y = label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true }
+  const tile = tone === 'dark' ? 'bg-white/[0.06] ring-white/10' : tone === 'light' ? 'bg-white ring-black/[0.08]' : 'bg-white ring-black/[0.08] dark:bg-white/[0.06] dark:ring-white/10'
+  return (
+    <span {...a11y} className={`relative inline-block shrink-0 overflow-hidden ring-1 ring-inset select-none ${tile} ${SIZES[size] || SIZES.md} ${className}`}>
+      <Themed light="/brand/mark.png" dark="/brand/mark-dark.png" tone={tone} className="absolute inset-x-0 bottom-0 w-full h-auto" />
     </span>
   )
 }
 
-const LOGO_SOURCES = ['/brand/logo.svg', '/brand/logo.png']
-// Shared across mounts, so a missing file is only requested once per page load.
-let logoIndex = 0
-
-export function TeamLogo({ height = 48, fallback = null, className = '' }) {
-  const [index, setIndex] = useState(logoIndex)
-  if (index >= LOGO_SOURCES.length) return fallback
-  return (
-    <img src={LOGO_SOURCES[index]} alt="Team 302, Lake Orion Robotics" style={{ height }} className={`w-auto object-contain ${className}`}
-      onError={() => { logoIndex = index + 1; setIndex(index + 1) }} />
-  )
+export function TeamLogo({ height = 48, tone = 'auto', className = '' }) {
+  return <Themed light="/brand/logo.png" dark="/brand/logo-dark.png" tone={tone} alt="Team 302, Lake Orion Robotics" style={{ height }} className={`w-auto object-contain ${className}`} />
 }

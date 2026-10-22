@@ -11,6 +11,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(message.title || 'Team 302', {
     body: message.body || 'You have a new notification.',
     icon: '/icons/icon-192.png',
+    // Android draws the badge as a mask in the status bar: a white silhouette of the dragon.
+    badge: '/icons/badge-96.png',
     tag: message.tag || undefined,
     renotify: !!message.tag,
     data: { url: message.url || '/inbox' },
