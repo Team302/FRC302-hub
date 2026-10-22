@@ -86,3 +86,13 @@ test('malformed bodies are 400, not 500', async () => {
   const res = await handle(new Request('http://localhost/api/items', { method: 'POST', headers: { Authorization: `Bearer ${app.users.alex.token}`, 'Content-Type': 'application/json' }, body: '{not json' }), app.env, {})
   assert.equal(res.status, 400)
 })
+
+test('dev login refuses other devices coming through the dev proxy unless DEV_LOGIN_LAN=on', async () => {
+  const { handle } = await import('../src/index.js')
+  const req = (addr) => new Request('http://localhost/api/auth/dev-login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Dev-Client-Address': addr }, body: JSON.stringify({ email: 'mentor@example.org' }) })
+  const app = await makeTeam()
+  assert.equal((await handle(req('192.168.1.50'), app.env, {})).status, 403)
+  assert.equal((await handle(req('::1'), app.env, {})).status, 200)
+  app.env.DEV_LOGIN_LAN = 'on'
+  assert.equal((await handle(req('192.168.1.50'), app.env, {})).status, 200)
+})

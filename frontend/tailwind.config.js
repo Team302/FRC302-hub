@@ -9,7 +9,7 @@ import plugin from 'tailwindcss/plugin.js'
 // paint (public/theme-init.js). Dark is the default.
 //
 //   light  warm paper neutrals, ink-on-paper primary buttons
-//   dark   near-black canvas, hairline borders, white primary buttons, 302 green accent
+//   dark   near-black canvas, hairline borders, white primary buttons, 302 dragon-green accent
 // (Carried over from ProjectPro's design system, with the accent swapped for 302's.)
 //
 // Tailwind's hue scales (red, amber, green…) keep their light values and are mirrored in dark
@@ -34,17 +34,16 @@ const NEUTRAL = {
     gray: { 50: '#111111', 100: '#181818', 200: '#262626', 300: '#333333', 400: '#838383', 500: '#8f8f8f', 600: '#a3a3a3', 700: '#c4c4c4', 800: '#e0e0e0', 900: '#ededed' },
   },
 }
-// 302 green: links, the active nav item, focus rings, progress. Used sparingly; primary buttons
-// are ink (.btn-primary). 600 is the text shade and clears 4.5:1 on white and canvas in light
-// (5.3:1 / 4.9:1) and dark (≈10:1). Gold (below) is the team's second colour, for highlights only.
-// TODO(302): confirm against the team's official brand colours and swap these two scales.
+// Team 302 colours, from the logo: dragon green (accent: links, active nav, focus rings, progress)
+// and flame red (`flame`, highlights only). Primary buttons stay ink (.btn-primary).
+// accent-600 is the text shade: ≥ 7:1 on white/canvas in light, ≥ 8:1 on black in dark.
 const ACCENT = {
-  light: { 50: '#ecfbf2', 100: '#d2f6e0', 200: '#a6ecc4', 300: '#6edaa1', 400: '#2fbf7c', 500: '#12a464', 600: '#087a48', 700: '#0a6640', 800: '#0c5034', 900: '#0b412c' },
-  dark:  { 50: '#03140c', 100: '#062214', 200: '#0b3a23', 300: '#0f5634', 400: '#138a52', 500: '#1fb36d', 600: '#3fd189', 700: '#76e3ab', 800: '#b0f0cd', 900: '#e3fbee' },
+  light: { 50: '#eef6f0', 100: '#d6eadb', 200: '#aed4b9', 300: '#7db893', 400: '#4b9a6b', 500: '#2b7d4c', 600: '#1f6239', 700: '#1a4f2f', 800: '#163f27', 900: '#12331f' },
+  dark:  { 50: '#08130c', 100: '#0d1f13', 200: '#14321e', 300: '#1d4a2b', 400: '#2b6b3f', 500: '#3f8f58', 600: '#5fb57a', 700: '#8fd0a3', 800: '#c0e6cb', 900: '#e6f5ea' },
 }
-const GOLD = {
-  light: { 400: '#f5b301', 500: '#d99a00', 600: '#a16207' },
-  dark:  { 400: '#f5b301', 500: '#fbbf24', 600: '#fcd34d' },
+const FLAME = {
+  light: { 400: '#d9472b', 500: '#b8321a', 600: '#9a2412' },
+  dark:  { 400: '#e0583c', 500: '#ec7356', 600: '#f39a83' },
 }
 const STATUS = {
   light: { success: '#16a34a', warning: '#d97706', danger: '#dc2626', info: '#2563eb' },
@@ -57,7 +56,7 @@ function themeVars(mode) {
   const out = { '--white': rgb(n.white), '--canvas': rgb(n.canvas), '--ink': rgb(n.ink) }
   for (const [k, hex] of Object.entries(n.gray)) out[`--brand-gray-${k}`] = rgb(hex)
   for (const [k, hex] of Object.entries(ACCENT[mode])) out[`--accent-${k}`] = rgb(hex)
-  for (const [k, hex] of Object.entries(GOLD[mode])) out[`--gold-${k}`] = rgb(hex)
+  for (const [k, hex] of Object.entries(FLAME[mode])) out[`--flame-${k}`] = rgb(hex)
   for (const [k, hex] of Object.entries(STATUS[mode])) out[`--status-${k}`] = rgb(hex)
   for (const hue of HUES) for (const s of SHADES) out[`--${hue}-${s}`] = rgb(defaultColors[hue][mode === 'dark' ? MIRROR[s] : s])
   return out
@@ -82,7 +81,7 @@ export default {
         // The one accent: links, the active nav item, focus rings, chart strokes. Primary buttons
         // are ink (.btn-primary), not accent.
         accent: scale('accent', ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900']),
-        gold: scale('gold', ['400', '500', '600']),
+        flame: scale('flame', ['400', '500', '600']),
         canvas: v('canvas'),
         status: { success: v('status-success'), warning: v('status-warning'), danger: v('status-danger'), info: v('status-info') },
         ...Object.fromEntries(HUES.map((hue) => [hue, scale(hue, SHADES)])),

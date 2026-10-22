@@ -7,28 +7,35 @@ import { del, get, patch, post } from '../lib/api'
 import { useSession } from '../context/Session'
 import { atLeast, VAULT_ACCESS } from '../lib/constants'
 import { fmtFull, parseServerTime, relative } from '../lib/format'
-import { EmptyState, Field, Modal, PageHeader, Spinner, useAction, useToast } from '../components/ui'
+import { useToast } from '../context/ToastContext'
+import useRun from '../lib/useRun'
+import EmptyState from '../components/ui/EmptyState'
+import Modal from '../components/ui/Modal'
+import PageHeader from '../components/ui/PageHeader'
+import { SkeletonTable } from '../components/ui/Skeleton'
+import Field from '../components/forms/Field'
+import { useConfirm } from '../components/list/useConfirm'
 
 const REVEAL_MS = 20000
 const CLIPBOARD_MS = 30000
 const STALE_DAYS = 365
 
-async function copyAndClear(text, toast, what) {
+async function copyAndClear(text, { success, error }, what) {
   try {
     await navigator.clipboard.writeText(text)
-    toast(`${what} copied. Clipboard clears in 30s.`)
+    success(`${what} copied`, 'The clipboard is cleared after 30 seconds.')
     setTimeout(async () => {
       try { if ((await navigator.clipboard.readText()) === text) await navigator.clipboard.writeText('') } catch { /* not focused or no permission */ }
     }, CLIPBOARD_MS)
   } catch {
-    toast('Couldn’t copy — your browser blocked clipboard access.', 'error')
+    error('Couldn’t copy', 'The browser blocked clipboard access.')
   }
 }
 
 function SecretField({ entry }) {
   const [secret, setSecret] = useState(null)
   const timer = useRef(null)
-  const run = useAction()
+  const run = useRun()
   const toast = useToast()
   useEffect(() => () => clearTimeout(timer.current), [])
   const fetchSecret = () => run(() => post(`/vault/${entry.id}/reveal`)).then((r) => r?.secret)
@@ -56,7 +63,7 @@ function SecretField({ entry }) {
 function TotpField({ entry }) {
   const [code, setCode] = useState(null)
   const [left, setLeft] = useState(0)
-  const run = useAction()
+  const run = useRun()
   const toast = useToast()
   useEffect(() => {
     if (!code) return undefined
@@ -84,7 +91,8 @@ function EntryForm({ entry, user, users, onSaved, onClose, onDeleted }) {
     name: entry?.name || '', url: entry?.url || '', username: entry?.username || '', notes: entry?.notes || '',
     min_role: entry?.min_role || 'lead', owner_id: entry?.owner_id || user.id, secret: '', totp: '', clearTotp: false,
   })
-  const run = useAction()
+  const run = useRun()
+  const [confirm, confirmDialog] = useConfirm()
   const submit = async (e) => {
     e.preventDefault()
     const body = { name: form.name, url: form.url, username: form.username, notes: form.notes, min_role: form.min_role }
@@ -92,20 +100,21 @@ function EntryForm({ entry, user, users, onSaved, onClose, onDeleted }) {
     if (form.secret) body.secret = form.secret
     if (form.totp) body.totp = form.totp
     if (editing && form.clearTotp) body.totp = null
-    const res = await run(() => (editing ? patch(`/vault/${entry.id}`, body) : post('/vault', body)), editing ? 'Saved.' : 'Added to the vault.')
+    const res = await run(() => (editing ? patch(`/vault/${entry.id}`, body) : post('/vault', body)), editing ? 'Saved' : 'Added to the vault')
     if (res) onSaved(res.entry)
   }
   const remove = async () => {
-    if (!window.confirm(`Delete “${entry.name}” from the vault? This can’t be undone.`)) return
-    if (await run(() => del(`/vault/${entry.id}`), 'Deleted.')) onDeleted(entry.id)
+    if (!(await confirm({ title: `Delete “${entry.name}”?`, message: 'The login and its access log entry stay in the audit log, but the password is gone for good.', confirmLabel: 'Delete', tone: 'danger' }))) return
+    if (await run(() => del(`/vault/${entry.id}`), 'Deleted')) onDeleted(entry.id)
   }
   const access = VAULT_ACCESS.filter((a) => a.id !== 'admin' || atLeast(user, 'admin'))
   return (
-    <Modal open onClose={onClose} title={editing ? `Edit ${entry.name}` : 'Add to vault'} wide
+    <Modal open onClose={onClose} title={editing ? `Edit ${entry.name}` : 'Add to vault'} size="lg"
       footer={<>
         {editing && atLeast(user, 'admin') && <button type="button" className="btn-danger mr-auto" onClick={remove}>Delete</button>}
         <button className="btn-ghost" onClick={onClose}>Cancel</button><button className="btn-primary" form="vault-form">{editing ? 'Save' : 'Add'}</button>
       </>}>
+      {confirmDialog}
       <form id="vault-form" onSubmit={submit} className="grid sm:grid-cols-2 gap-4" autoComplete="off">
         <Field label="Name"><input className="input" required maxLength={100} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Onshape team account" /></Field>
         <Field label="Link"><input className="input" type="url" maxLength={500} value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://" /></Field>
@@ -141,8 +150,8 @@ function AuditModal({ entry, onClose }) {
   const [rows, setRows] = useState(null)
   useEffect(() => { get(`/vault/${entry.id}/audit`).then((d) => setRows(d.audit)) }, [entry.id])
   return (
-    <Modal open onClose={onClose} title={`Access log — ${entry.name}`} wide>
-      {!rows ? <Spinner /> : rows.length === 0 ? <p className="text-sm text-brand-gray-500">No activity yet.</p> : (
+    <Modal open onClose={onClose} title={`Access log: ${entry.name}`} size="lg">
+      {!rows ? <SkeletonTable rows={4} cols={3} /> : rows.length === 0 ? <p className="text-sm text-brand-gray-500">No activity yet.</p> : (
         <table className="table">
           <thead><tr><th>When</th><th>Who</th><th>What</th><th>IP</th></tr></thead>
           <tbody>{rows.map((r) => (
@@ -162,7 +171,7 @@ export default function Vault() {
   const [audit, setAudit] = useState(null)
   useEffect(() => { get('/vault').then(setData) }, [])
 
-  if (!data) return <Spinner />
+  if (!data) return <div className="card"><SkeletonTable rows={4} cols={3} /></div>
   const needle = q.trim().toLowerCase()
   const entries = data.entries.filter((e) => !needle || `${e.name} ${e.username} ${e.url}`.toLowerCase().includes(needle))
   const saved = (entry) => {
@@ -172,7 +181,7 @@ export default function Vault() {
 
   return (
     <div className="animate-fade-up">
-      <PageHeader title="Vault" subtitle="Shared team logins: CAD, the FIRST dashboard, social accounts, the shop Wi-Fi."
+      <PageHeader title="Vault" subtitle="Shared team logins. Every password reveal is recorded."
         actions={atLeast(user, 'lead') && data.configured && <button className="btn-primary" onClick={() => setEditing('new')}><Plus className="w-4 h-4" />Add login</button>} />
 
       <div className="card flex items-start gap-3 px-5 py-3.5 mb-5">
@@ -184,7 +193,7 @@ export default function Vault() {
       </div>
 
       {!data.configured ? (
-        <div className="card"><EmptyState icon={Lock} title="The vault isn’t set up" body="A mentor needs to set the VAULT_KEY secret on the server (README → Vault). Until then nothing can be stored." /></div>
+        <div className="card"><EmptyState icon={Lock} title="The vault isn’t set up" message="The server has no VAULT_KEY yet, so nothing can be stored. See README → Deploying to Cloudflare." /></div>
       ) : (
         <>
           <div className="relative mb-4 max-w-sm">
@@ -192,7 +201,7 @@ export default function Vault() {
             <input className="input pl-8" placeholder="Search logins" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search vault" />
           </div>
           {entries.length === 0 ? (
-            <div className="card"><EmptyState icon={KeyRound} title={data.entries.length ? 'No matches' : 'Nothing here yet'} body={!data.entries.length && atLeast(user, 'lead') ? 'Move shared logins out of group chats and sticky notes and into here.' : undefined} /></div>
+            <div className="card"><EmptyState icon={KeyRound} title={data.entries.length ? 'No matches' : 'Nothing here yet'} message={!data.entries.length && atLeast(user, 'lead') ? 'Add the team’s shared logins so they aren’t kept in group chats.' : undefined} /></div>
           ) : (
             <div className="grid gap-3 lg:grid-cols-2">
               {entries.map((e) => {
@@ -244,5 +253,5 @@ export default function Vault() {
 
 function CopyPlain({ text }) {
   const toast = useToast()
-  return <button className="btn-icon" onClick={() => navigator.clipboard.writeText(text).then(() => toast('Copied.'), () => toast('Couldn’t copy.', 'error'))} aria-label="Copy username"><Copy className="w-4 h-4" /></button>
+  return <button className="btn-icon" onClick={() => navigator.clipboard.writeText(text).then(() => toast.success('Username copied'), () => toast.error('Couldn’t copy'))} aria-label="Copy username"><Copy className="w-4 h-4" /></button>
 }

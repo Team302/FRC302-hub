@@ -39,3 +39,10 @@ export const post = (path, body = {}) => api(path, { method: 'POST', body })
 export const patch = (path, body) => api(path, { method: 'PATCH', body })
 export const put = (path, body) => api(path, { method: 'PUT', body })
 export const del = (path) => api(path, { method: 'DELETE' })
+
+// fetch()-shaped call for components ported from ProjectPro (lib/trends.js).
+export async function apiFetch(path, init = {}) {
+  const token = await tokenSource()
+  const headers = { ...(init.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+  return fetch(path, { ...init, headers })
+}

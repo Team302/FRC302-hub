@@ -1,4 +1,5 @@
-// Who is signed in, and the team directory (people + subteams) most screens need.
+// Who is signed in, plus what most screens share: the people and subteams directory, the board
+// list (sidebar, search, "New task"), the unread inbox count, and the global "New …" dialogs.
 //
 // Sign-in mode comes from GET /api/auth/config:
 //   clerk  Clerk's widget; its short-lived session token is fetched fresh for every request.
@@ -6,18 +7,26 @@
 //   off    nothing configured: say so instead of showing a broken sign-in.
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { get, post, setTokenSource, setUnauthorizedHandler } from '../lib/api'
-import FullPageMessage from '../components/FullPageMessage'
+import { ROLE } from '../lib/constants'
+import FullPageLoader from '../components/brand/FullPageLoader'
+import SignInLayout from '../components/brand/SignInLayout'
+import QuickCreate from '../components/QuickCreate'
+import Avatar from '../components/ui/Avatar'
 
 const ClerkGate = lazy(() => import('./ClerkGate'))
 const SessionContext = createContext(null)
 export const useSession = () => useContext(SessionContext)
 
 const DEV_KEY = 'hub302.devToken'
+const INBOX_POLL_MS = 30000
 
 function TeamProvider({ onSignOut, children }) {
   const [user, setUser] = useState(null)
   const [users, setUsers] = useState([])
   const [subteams, setSubteams] = useState([])
+  const [boards, setBoards] = useState([])
+  const [unread, setUnread] = useState(0)
+  const [newType, setNewType] = useState(null)
   const [error, setError] = useState(null)
 
   const refreshTeam = useCallback(async () => {
@@ -25,30 +34,48 @@ function TeamProvider({ onSignOut, children }) {
     setUsers(u.users)
     setSubteams(s.subteams)
   }, [])
+  const refreshBoards = useCallback(() => get('/boards').then((d) => setBoards(d.boards)).catch(() => {}), [])
+  const refreshUnread = useCallback(() => get('/notifications').then((d) => setUnread(d.unread)).catch(() => {}), [])
 
   useEffect(() => {
     let live = true
     get('/me')
-      .then(async (d) => { if (!live) return; setUser(d.user); await refreshTeam() })
+      .then(async (d) => { if (!live) return; setUser(d.user); await Promise.all([refreshTeam(), refreshBoards(), refreshUnread()]) })
       .catch((e) => live && setError(e))
     return () => { live = false }
-  }, [refreshTeam])
+  }, [refreshTeam, refreshBoards, refreshUnread])
+
+  useEffect(() => {
+    if (!user) return undefined
+    const tick = () => { if (document.visibilityState === 'visible') refreshUnread() }
+    const t = setInterval(tick, INBOX_POLL_MS)
+    document.addEventListener('visibilitychange', tick)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', tick) }
+  }, [user, refreshUnread])
 
   const value = useMemo(() => ({
-    user, setUser, users, subteams, refreshTeam, signOut: onSignOut,
+    user, setUser, users, subteams, boards, unread, setUnread,
+    refreshTeam, refreshBoards, refreshUnread, signOut: onSignOut, openNew: setNewType,
     userById: Object.fromEntries(users.map((u) => [u.id, u])),
     subteamById: Object.fromEntries(subteams.map((s) => [s.id, s])),
-  }), [user, users, subteams, refreshTeam, onSignOut])
+  }), [user, users, subteams, boards, unread, refreshTeam, refreshBoards, refreshUnread, onSignOut])
 
   if (error) {
+    const notOnTeam = error.status === 401
     return (
-      <FullPageMessage title={error.status === 401 ? 'You’re not on the team roster yet' : 'Couldn’t load your account'}
-        body={error.status === 401 ? 'You signed in, but no team member has this email. Ask a mentor to add you in Team, using the email you sign in with.' : error.message}
-        action={<button className="btn-secondary" onClick={onSignOut}>Sign out</button>} />
+      <SignInLayout heading={notOnTeam ? 'You’re not on the team yet' : 'Couldn’t load your account'}
+        subheading={notOnTeam ? 'You signed in, but no team member has this email. Ask a mentor to add you under People, using the email you sign in with.' : error.message}>
+        <button className="btn-secondary w-full" onClick={onSignOut}>Sign out</button>
+      </SignInLayout>
     )
   }
-  if (!user) return <FullPageMessage loading title="Loading 302 Hub…" />
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  if (!user) return <FullPageLoader label="Loading Team 302…" />
+  return (
+    <SessionContext.Provider value={value}>
+      {children}
+      <QuickCreate type={newType} onClose={() => setNewType(null)} />
+    </SessionContext.Provider>
+  )
 }
 
 function DevLogin({ onToken }) {
@@ -65,23 +92,33 @@ function DevLogin({ onToken }) {
     } catch (e) { setError(e.message) }
   }
   return (
-    <FullPageMessage title="Development sign-in" body="Local only — production uses Clerk. Pick a team member to act as.">
-      <div className="w-full max-w-sm space-y-2 text-left">
-        {data?.users?.map((u) => (
-          <button key={u.email} className="btn-secondary w-full justify-between" onClick={() => signIn(u.email)}>
-            <span>{u.name}</span><span className="text-xs text-brand-gray-500">{u.role}</span>
-          </button>
-        ))}
-        {data?.bootstrap_email && (
-          <button className="btn-primary w-full" onClick={() => signIn(data.bootstrap_email)}>Set up as {data.bootstrap_email}</button>
-        )}
-        <form className="flex gap-2 pt-2" onSubmit={(e) => { e.preventDefault(); signIn(email) }}>
-          <input className="input" placeholder="email@example.org" value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Email" />
-          <button className="btn-secondary">Go</button>
+    <SignInLayout heading="Sign in" subheading="Development mode. Choose a team member to sign in as.">
+      <div className="space-y-4">
+        <div className="card divide-y divide-brand-gray-100 max-h-[22rem] overflow-y-auto">
+          {data?.users?.map((u) => (
+            <button key={u.email} type="button" onClick={() => signIn(u.email)} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-brand-gray-50 transition-colors">
+              <Avatar name={u.name} size="md" />
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-brand-black truncate">{u.name}</span>
+                <span className="block text-xs text-brand-gray-500 truncate">{u.email}</span>
+              </span>
+              <span className="badge-gray">{ROLE[u.role]?.label}</span>
+            </button>
+          ))}
+          {data?.bootstrap_email && (
+            <button type="button" onClick={() => signIn(data.bootstrap_email)} className="w-full px-4 py-3 text-left hover:bg-brand-gray-50">
+              <span className="block text-sm font-medium">Set up as {data.bootstrap_email}</span>
+              <span className="block text-xs text-brand-gray-500">First mentor account (BOOTSTRAP_ADMIN_EMAIL)</span>
+            </button>
+          )}
+        </div>
+        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); signIn(email) }}>
+          <input className="input" type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Email address" />
+          <button className="btn-secondary shrink-0">Continue</button>
         </form>
-        {error && <p className="text-sm text-status-danger">{error}</p>}
+        {error && <p className="text-sm text-status-danger" role="alert">{error}</p>}
       </div>
-    </FullPageMessage>
+    </SignInLayout>
   )
 }
 
@@ -106,14 +143,16 @@ export function SessionProvider({ children }) {
     setUnauthorizedHandler((d) => { if (d?.code === 'unauthenticated') devSignOut() })
   }
 
-  if (configError) return <FullPageMessage title="Can’t reach 302 Hub" body={configError} />
-  if (!config) return <FullPageMessage loading title="Loading…" />
+  if (configError) {
+    return <SignInLayout heading="Can’t reach the server" subheading={`${configError} If you’re running locally, check that \`npm run dev\` started both the worker and the app.`} />
+  }
+  if (!config) return <FullPageLoader />
   if (config.mode === 'off') {
-    return <FullPageMessage title="Sign-in isn’t set up" body="A mentor needs to add the Clerk keys to this server (README → Deploy)." />
+    return <SignInLayout heading="Sign-in isn’t set up" subheading="The server has no Clerk keys yet. See README → Deploying to Cloudflare." />
   }
   if (config.mode === 'clerk') {
     return (
-      <Suspense fallback={<FullPageMessage loading title="Loading…" />}>
+      <Suspense fallback={<FullPageLoader />}>
         <ClerkGate publishableKey={config.clerk_publishable_key}>
           {(signOut) => <TeamProvider onSignOut={signOut}>{children}</TeamProvider>}
         </ClerkGate>

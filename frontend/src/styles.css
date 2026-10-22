@@ -28,9 +28,9 @@
     --glass-blur: 24px;
     --glass-sheen: 255 255 255 / 0.55;
     --glass-shade: 15 15 15 / 0.03;
-    --backdrop-a: 18 164 100 / 0.10;
+    --backdrop-a: 43 125 76 / 0.08;
     --backdrop-b: 161 161 170 / 0.08;
-    --backdrop-c: 245 179 1 / 0.05;
+    --backdrop-c: 184 50 26 / 0.03;
   }
   .dark {
     --glass-fill: 255 255 255 / 0.03;
@@ -40,9 +40,9 @@
     --glass-shadow: 0 1px 1px rgb(0 0 0 / 0.5), 0 16px 40px -16px rgb(0 0 0 / 0.8);
     --glass-sheen: 255 255 255 / 0.035;
     --glass-shade: 0 0 0 / 0.3;
-    --backdrop-a: 31 179 109 / 0.12;
-    --backdrop-b: 18 164 100 / 0.05;
-    --backdrop-c: 245 179 1 / 0.04;
+    --backdrop-a: 43 125 76 / 0.14;
+    --backdrop-b: 29 74 43 / 0.08;
+    --backdrop-c: 184 50 26 / 0.04;
   }
   body::before {
     content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;

@@ -37,33 +37,54 @@ const { token: lead } = await call(null, 'POST', '/auth/dev-login', { email: 'jo
 
 const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
 const boards = [
-  ['Drivetrain', 'st_mech', 'orange', [
-    ['Finalize swerve module CAD', 'Sofia', 'review', 'high', 1], ['Order MK4i modules + spares', 'Jordan', 'done', 'critical', -3],
-    ['Cut and drill frame rails', 'Marcus', 'working', 'high', 2], ['Bumper frame', null, 'not_started', 'medium', 9],
-    ['Belly pan — waiting on polycarb', 'Marcus', 'stuck', 'medium', -1],
+  ['2027 Robot', 'st_mech', 'green', 'build', [
+    ['Swerve module CAD', 'Sofia', 'review', 'high', 1, 'Drivetrain', [-10, 2], 12, true],
+    ['Order MK4i modules and spares', 'Jordan', 'done', 'critical', -3, 'Drivetrain', null, 1, true],
+    ['Cut and drill frame rails', 'Marcus', 'working', 'high', 2, 'Drivetrain', [-2, 4], 6, false],
+    ['Belly pan (waiting on polycarb)', 'Marcus', 'stuck', 'medium', -1, 'Drivetrain', [-4, -1], 3, false],
+    ['Intake roller prototype', 'Ava', 'working', 'high', 5, 'Intake', [0, 8], 10, false],
+    ['Shooter flywheel spin-up test', 'Ethan', 'not_started', 'medium', 12, 'Shooter', [9, 16], 4, false],
+    ['Climber hook geometry', null, 'not_started', 'low', 20, 'Climber', [14, 24], 8, false],
+    ['Wire PDH and CAN bus', 'Ava', 'not_started', 'high', 9, 'Electrical', [6, 12], 5, true],
   ]],
-  ['Software', 'st_prog', 'blue', [
+  ['Software', 'st_prog', 'blue', 'blank', [
     ['Swerve drive characterization', 'Ethan', 'working', 'high', 3], ['AprilTag pose estimation', 'Priya', 'working', 'critical', 5],
-    ['Auto: 3-piece center', 'Priya', 'not_started', 'high', 12], ['Driver dashboard layout', 'Ethan', 'review', 'low', 4],
+    ['Auto: three-piece center', 'Priya', 'not_started', 'high', 12], ['Driver dashboard layout', 'Ethan', 'review', 'low', 4],
   ]],
-  ['Business & Outreach', 'st_biz', 'green', [
-    ['Sponsor thank-you packets', 'Noah', 'working', 'medium', 6], ['Impact award essay draft', 'Mia', 'not_started', 'high', 14],
-    ['Library STEM night volunteers', 'Mia', 'done', 'medium', -7], ['Update team website sponsors page', null, 'not_started', 'low', null],
+  ['Outreach', 'st_out', 'pink', 'outreach', [
+    ['Library STEM night', 'Mia', 'done', 'medium', -7], ['Elementary school robot demo', 'Mia', 'working', 'high', 6],
+    ['Sponsor thank-you visits', 'Noah', 'not_started', 'medium', 14], ['Summer camp volunteer signup', null, 'not_started', 'low', null],
   ]],
 ]
-let firstBoard
-for (const [name, subteam, color, items] of boards) {
-  const { board } = await call(lead, 'POST', '/boards', { name, subteam_id: subteam, color })
-  firstBoard ??= board
-  const { groups } = await call(lead, 'GET', `/boards/${board.id}`)
-  for (const [i, [title, who, status, priority, due]] of items.entries()) {
-    const { item } = await call(lead, 'POST', '/items', { board_id: board.id, group_id: groups[i % 2].id, title, status, priority, assignee_id: who ? ids[who] : null, due_date: due === null ? null : day(due) })
-    if (status === 'stuck') await call(lead, 'POST', `/items/${item.id}/updates`, { body: 'Polycarb sheet is backordered until next week. Can we use the scrap from last year?' })
+let robot
+for (const [name, subteam, color, template, items] of boards) {
+  const { board } = await call(lead, 'POST', '/boards', { name, subteam_id: subteam, color, template })
+  const full = await call(lead, 'GET', `/boards/${board.id}`)
+  robot ??= { board, ...full }
+  const col = Object.fromEntries(full.columns.map((c) => [c.title, c]))
+  for (const [i, [title, who, status, priority, due, subsystem, span, hours, parts]] of items.entries()) {
+    const { item } = await call(lead, 'POST', '/items', { board_id: board.id, group_id: full.groups[Math.min(i % 3, full.groups.length - 1)].id, title, status, priority, assignee_id: who ? ids[who] : null, due_date: due === null ? null : day(due) })
+    const put = (c, value) => call(lead, 'PUT', `/items/${item.id}/values/${c.id}`, { value })
+    if (col.Subsystem && subsystem) await put(col.Subsystem, [col.Subsystem.settings.options.find((o) => o.label === subsystem).id])
+    if (col.Timeline && span) await put(col.Timeline, { start: day(span[0]), end: day(span[1]) })
+    if (col['Est. hours'] && hours) await put(col['Est. hours'], hours)
+    if (col['Parts ordered'] && parts) await put(col['Parts ordered'], true)
+    if (col['Event date'] && due !== null) await put(col['Event date'], day(due))
+    if (col.Volunteers && who) await put(col.Volunteers, [ids[who], ids.Noah])
+    if (col['Volunteer hours'] && status === 'done') await put(col['Volunteer hours'], 14)
+    if (status === 'stuck') await call(lead, 'POST', `/items/${item.id}/updates`, { body: '@Coach Rivera polycarb is backordered until next week. Can we use last year’s scrap?', mentions: [me.id] })
+    if (title.startsWith('Swerve module CAD')) {
+      for (const [t, w, s] of [['Module mount plate', 'Sofia', 'done'], ['Encoder bracket', 'Sofia', 'working'], ['Bevel gear clearance check', 'Marcus', 'not_started']]) {
+        await call(lead, 'POST', '/items', { board_id: board.id, parent_id: item.id, title: t, assignee_id: ids[w], status: s })
+      }
+      await call(lead, 'PUT', `/items/${item.id}/values/${col.CAD.id}`, { value: { url: 'https://cad.onshape.com/', text: 'Swerve assembly' } })
+    }
   }
 }
-// One task for the coach so Home has something.
-const { groups: g0 } = await call(lead, 'GET', `/boards/${firstBoard.id}`)
-await call(lead, 'POST', '/items', { board_id: firstBoard.id, group_id: g0[0].id, title: 'Sign off on drivetrain budget', assignee_id: me.id, due_date: day(1), priority: 'high' })
+// One task for the coach so Home and My work have something, and an automation to show off.
+await call(lead, 'POST', '/items', { board_id: robot.board.id, group_id: robot.groups[0].id, title: 'Approve drivetrain budget', assignee_id: me.id, due_date: day(1), priority: 'high' })
+await call(lead, 'POST', `/boards/${robot.board.id}/automations`, { trigger: { type: 'status_to', status: 'done' }, action: { type: 'move_to_group', group_id: robot.groups.at(-1).id } })
+await call(lead, 'POST', `/boards/${robot.board.id}/automations`, { trigger: { type: 'status_to', status: 'stuck' }, action: { type: 'notify', user_ids: [me.id] } })
 
 const start = new Date(); start.setDate(start.getDate() + 1); start.setHours(18, 30, 0, 0)
 const { meeting } = await call(lead, 'POST', '/meetings', { title: 'Tuesday all-hands', starts_at: start.toISOString(), duration_min: 45, location: 'Shop', facilitator_id: ids.Jordan })
