@@ -17,7 +17,8 @@ component library (app shell, top bar, modals, toasts, stat cards, charts), in t
 ## What it does
 
 **Boards.** One per subteam or project, started from a template: Robot build (Design → Fabrication → Assembly → Testing,
-with Subsystem, Timeline, Est. hours, Parts ordered and CAD columns), Competition prep, Outreach, or blank.
+with Subsystem, Timeline, Est. hours, Parts ordered and CAD columns), Parts & purchasing (Requested → Approved →
+Ordered → Received, with vendor, link, quantity, cost totals per group and tracking), Competition prep, Outreach, or blank.
 - **Columns you define:** status labels, people (several per task), date, timeline, text, numbers, checkbox, tags, link.
   Every board also has Owner, Status, Priority and Due date. The statuses can be renamed per board, and Owner, Priority
   and Due date can be hidden.
@@ -36,6 +37,19 @@ with Subsystem, Timeline, Est. hours, Parts ordered and CAD columns), Competitio
 **Inbox.** Notifications when you're assigned, added to a people column, @mentioned, when someone updates or changes the
 status of a task you own, automation alerts, and due-date reminders (hourly job, once per task per day). The unread count
 shows in the sidebar and on the top-bar bell.
+
+**Install it like an app.** Add 302 Hub to a phone's Home Screen or install it from Chrome/Edge. Turn on
+**push notifications** per device (Inbox → Turn on). Messages are encrypted end to end to the device (RFC 8291), so
+Google/Apple/Mozilla's push services can't read them.
+
+**Calendar feed.** Account menu → Calendar feed gives a private link for Google Calendar, Apple Calendar or Outlook:
+team meetings you can see and your tasks with due dates.
+
+**Attendance and hours** (leads and mentors). Hours and attendance rate per person from meetings run in the app,
+for lettering, travel eligibility and grant reports. Filter by date range and subteam; export to CSV. Everyone sees
+their own hours on Home.
+
+**Recurring meetings.** Schedule a weekly series (up to 52) with the same agenda; delete the rest of a series in one go.
 
 **My work.** Every open task and subitem you own across all boards, grouped into Overdue, Today, Next 7 days and later.
 
@@ -109,7 +123,8 @@ Members can't see other people's emails. If your district has a data-privacy agr
 ### Other limits you should know about
 - **Self check-in trusts the device.** It proves someone had the app open while the meeting was live, not that they were in
   the room. Whoever runs the meeting can correct any entry.
-- **Notifications are in-app only.** There is no email or push yet; people see the Inbox count when they open the app.
+- **Push notifications** reach phones and computers where someone turned them on (Inbox → Turn on). On iPhone/iPad
+  that only works after adding the app to the Home Screen (iOS 16.4+). There is no email yet.
 - **Near-real-time, not real-time.** Boards refresh every 20 seconds while open, and a live meeting every 10 seconds for
   people following along. Two people editing the same cell at once: the last save wins.
 - **One owner per task.** The built-in Owner is single on purpose (one person accountable); add a People column for
@@ -157,6 +172,10 @@ build time on your machine and none of it ships to the browser. The fix is a Tai
    npx wrangler secret put CLERK_JWT_KEY          # Clerk → API keys → JWT public key (PEM)
    npx wrangler secret put BOOTSTRAP_ADMIN_EMAIL  # the head mentor
    npx wrangler secret put VAULT_KEY              # base64 of 32 random bytes; back it up offline
+   npm run vapid                                  # prints a Web Push key pair, then:
+   npx wrangler secret put VAPID_PUBLIC_KEY
+   npx wrangler secret put VAPID_PRIVATE_KEY
+   npx wrangler secret put VAPID_SUBJECT          # mailto:you@team302.org (push services' contact)
    ```
    **Back up `VAULT_KEY` somewhere outside Cloudflare.** If it's lost, every stored password is unrecoverable.
 5. `npm run deploy` runs the tests, builds the app, migrates D1 and deploys.

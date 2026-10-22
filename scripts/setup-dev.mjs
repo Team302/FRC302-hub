@@ -4,7 +4,15 @@
 //   - an existing .dev.vars keeps its values, except a placeholder JWT_SECRET or an empty
 //     VAULT_KEY (as copied from .dev.vars.example), which are replaced with random ones.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, generateKeyPairSync } from 'node:crypto'
+
+// A Web Push key pair for local testing (the browser only accepts push from localhost or https).
+function vapidLines() {
+  const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+  const pub = publicKey.export({ format: 'jwk' })
+  const raw = Buffer.concat([Buffer.from([4]), Buffer.from(pub.x, 'base64url'), Buffer.from(pub.y, 'base64url')])
+  return [`VAPID_PUBLIC_KEY=${raw.toString('base64url')}`, `VAPID_PRIVATE_KEY=${privateKey.export({ format: 'jwk' }).d}`]
+}
 
 mkdirSync('frontend/dist', { recursive: true })
 
@@ -17,6 +25,7 @@ if (!existsSync('.dev.vars')) {
     `JWT_SECRET=${randomBytes(32).toString('hex')}`,
     `BOOTSTRAP_ADMIN_EMAIL=${email}`,
     `VAULT_KEY=${randomBytes(32).toString('base64')}`,
+    ...vapidLines(),
     '',
   ].join('\n'))
   console.log(`Created .dev.vars (first mentor: ${email}).`)
@@ -30,6 +39,10 @@ if (!existsSync('.dev.vars')) {
   if (/^VAULT_KEY=\s*$/m.test(text)) {
     text = text.replace(/^VAULT_KEY=.*$/m, `VAULT_KEY=${randomBytes(32).toString('base64')}`)
     fixed.push('VAULT_KEY')
+  }
+  if (!/^VAPID_PUBLIC_KEY=\S/m.test(text)) {
+    text = `${text.replace(/^VAPID_(PUBLIC|PRIVATE)_KEY=.*\n?/gm, '').replace(/\n*$/, '\n')}${vapidLines().join('\n')}\n`
+    fixed.push('push notification keys')
   }
   if (fixed.length) {
     writeFileSync('.dev.vars', text)

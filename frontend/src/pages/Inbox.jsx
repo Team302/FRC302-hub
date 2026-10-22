@@ -10,6 +10,7 @@ import PageHeader from '../components/ui/PageHeader'
 import EmptyState from '../components/ui/EmptyState'
 import FilterChips from '../components/ui/FilterChips'
 import { SkeletonTable } from '../components/ui/Skeleton'
+import PushToggle from '../components/PushToggle'
 
 const ICON = { assigned: UserPlus, mentioned: AtSign, update: MessageSquare, status: RefreshCw, due: Clock, automation: Zap }
 
@@ -36,6 +37,7 @@ export default function Inbox() {
     <div className="max-w-3xl">
       <PageHeader title="Inbox" subtitle="Assignments, mentions and changes to your tasks."
         actions={data?.unread > 0 && <button type="button" className="btn-secondary btn-sm" onClick={readAll}><CheckCheck className="w-4 h-4" />Mark all read</button>} />
+      <div className="mb-5"><PushToggle /></div>
       <FilterChips className="mb-4" aria-label="Show" value={filter} onChange={setFilter} options={[
         { key: 'all', label: 'All' }, { key: 'unread', label: 'Unread', count: data?.unread ?? null }, { key: 'mentioned', label: 'Mentions' },
       ]} />

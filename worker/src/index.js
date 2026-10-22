@@ -12,6 +12,7 @@ import { calendarRoutes } from './routes/calendar.js'
 import { homeRoutes } from './routes/home.js'
 import { itemRoutes } from './routes/items.js'
 import { meetingRoutes } from './routes/meetings.js'
+import { pushRoutes } from './routes/push.js'
 import { reportRoutes } from './routes/reports.js'
 import { teamRoutes } from './routes/team.js'
 import { vaultRoutes } from './routes/vault.js'
@@ -37,6 +38,7 @@ export function buildRouter() {
   homeRoutes(router, authed)
   calendarRoutes(router, authed)
   reportRoutes(router, authed)
+  pushRoutes(router, authed)
   router.get('/api/health', () => Response.json({ ok: true }))
   router.all('/api/*', () => { throw new HttpError(404, 'No such API route.', 'not_found') })
   return router
@@ -55,8 +57,10 @@ export async function handle(request, env, ctx) {
   if (!pathname.startsWith('/api/')) {
     return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not found', { status: 404 })
   }
+  // Per-request env with waitUntil, so work like push delivery can finish after the response.
+  const requestEnv = { ...env, waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined }
   try {
-    const response = await router.fetch(request, env, ctx)
+    const response = await router.fetch(request, requestEnv, ctx)
     return withHeaders(response || Response.json({ error: 'No such API route.' }, { status: 404 }))
   } catch (e) {
     if (e instanceof HttpError) return withHeaders(Response.json({ error: e.message, code: e.code }, { status: e.status }))
@@ -69,5 +73,5 @@ export async function handle(request, env, ctx) {
 export default {
   fetch: handle,
   // Hourly (wrangler.toml [triggers]); due-date reminders go out once per task per day.
-  scheduled: (_controller, env, ctx) => ctx.waitUntil(sendDueReminders(env)),
+  scheduled: (_controller, env, ctx) => ctx.waitUntil(sendDueReminders({ ...env, waitUntil: (p) => ctx.waitUntil(p) })),
 }

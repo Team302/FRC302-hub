@@ -24,6 +24,11 @@ function RoleOnly({ role, children }) {
   return atLeast(user, role) ? children : <Navigate to="/" replace />
 }
 
+// Push notifications and "install as an app" need the service worker (public/sw.js).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ToastProvider>
