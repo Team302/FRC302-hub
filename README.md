@@ -1,38 +1,55 @@
 # 302 Hub
 
-Task boards, meetings and a shared credential vault for **FRC Team 302, The Dragons**.
-Monday.com-style boards, without Monday's learning curve. It uses ProjectPro's stack (Cloudflare Workers + D1 + React/Tailwind)
-and its design system (ink buttons, glass surfaces, dark by default), with a 302 green accent.
+Task boards, meetings and a shared credential vault for **FRC Team 302, Lake Orion Robotics (The Dragons)**.
+Boards work like Monday.com. The app is built on ProjectPro's stack (Cloudflare Workers + D1 + React/Tailwind) and its
+component library (app shell, top bar, modals, toasts, stat cards, charts), in the team's dragon green and flame red.
 
-![Home](docs/screenshots/01-home.png)
+![Board](docs/screenshots/02-board-table.png)
 
-| Boards (table) | Boards (kanban) |
+| Home | Task panel |
 |---|---|
-| ![Board table](docs/screenshots/03-board-table.png) | ![Kanban](docs/screenshots/04-board-kanban.png) |
-| **Meeting: run mode** | **Vault** |
-| ![Run](docs/screenshots/07-meeting-run.png) | ![Vault](docs/screenshots/10-vault-revealed.png) |
+| ![Home](docs/screenshots/01-home.png) | ![Task](docs/screenshots/09-item-panel.png) |
+| **Kanban** | **Timeline** |
+| ![Kanban](docs/screenshots/05-kanban.png) | ![Timeline](docs/screenshots/07-timeline.png) |
+| **Meeting, live** | **Light theme** |
+| ![Meeting](docs/screenshots/17-meeting-run.png) | ![Light](docs/screenshots/22-board-light.png) |
 
 ## What it does
 
-**Boards.** One per subteam or project. Each board has groups (This week / Next up / Backlog) and tasks. Every task has an
-owner, a status (Not started, Working on it, Stuck, Needs review, Done), a priority and a due date, all editable inline.
-There's a table view and a drag-and-drop kanban, a "Mine" filter, a person filter and search. Each task opens a side panel
-with a description and an updates thread.
+**Boards.** One per subteam or project, started from a template: Robot build (Design → Fabrication → Assembly → Testing,
+with Subsystem, Timeline, Est. hours, Parts ordered and CAD columns), Competition prep, Outreach, or blank.
+- **Columns you define:** status labels, people (several per task), date, timeline, text, numbers, checkbox, tags, link.
+  Every board also has Owner, Status, Priority and Due date. The statuses can be renamed per board, and Owner, Priority
+  and Due date can be hidden.
+- **Groups** with a summary row under each: status mix, date range, number totals, checkbox counts, who's involved.
+- **Subitems** under any task, with the same columns.
+- **Drag and drop** to reorder tasks or move them between groups. Bulk-select to change status or owner, move,
+  duplicate or delete.
+- **Search, person filter, filters** (status, priority, overdue, due this week, no date) and **sort** by any column.
+- **Views:** Main table, Kanban (lanes by status or any status column), Calendar (drag to reschedule), Timeline/Gantt,
+  and Chart (status mix, open tasks per person and per group).
+- **Task panel:** every field, an updates thread with **@mentions**, subitems, and a full **history** of who changed what.
+- **Automations:** "when status changes to Done, move it to Testing", "when Stuck, notify a mentor", "when a task is
+  created, assign it to …". Loops are capped.
+- **Favorites** pin boards to the top of the sidebar.
 
-**Meetings.** *Plan:* an agenda where every topic has a timebox and an owner, with a warning when the agenda runs longer
-than the meeting. You can copy last week's agenda. *Run:* one topic at a time with a big countdown that turns red on
-overtime, notes per topic, one-tap attendance, a decisions box, and action items. An action item is created as a real
-task on a board, with an owner and a due date. Members can check themselves in from their phone. *Recap:* a Markdown
-summary (attendance, agenda notes, decisions, action items) to paste into Slack, Discord or email, or to print.
+**Inbox.** Notifications when you're assigned, added to a people column, @mentioned, when someone updates or changes the
+status of a task you own, automation alerts, and due-date reminders (hourly job, once per task per day). The unread count
+shows in the sidebar and on the top-bar bell.
 
-**Vault.** Shared team logins: Onshape, the FIRST dashboard, social accounts, the shop Wi-Fi. Each entry is visible to
-*everyone*, *leads and mentors*, or *mentors only*. Passwords are shown one at a time, auto-hide after 20 seconds, and are
-cleared from the clipboard after 30 seconds. **Every reveal is logged with name, time and IP.** The vault can also hold a
-**2FA authenticator key**, so the team account doesn't live on one mentor's phone. The server returns the 6-digit code,
-never the key.
+**My work.** Every open task and subitem you own across all boards, grouped into Overdue, Today, Next 7 days and later.
 
-**Home.** Your open tasks (soonest first), the meeting happening now, upcoming meetings, stuck tasks across the team, and
-progress for each board.
+**Search (⌘K / Ctrl K).** Tasks, boards and meetings you can see.
+
+**Meetings.** *Agenda:* topics with an owner and a time limit; it warns when the agenda runs longer than the meeting, and you
+can copy last week's. *Run:* one topic at a time with a countdown that turns red on overtime, notes per topic, one-click
+attendance, decisions, and action items that are created as real tasks on a board. Members check themselves in.
+*Recap:* a Markdown summary to paste into Slack, Discord or email, or print.
+
+**Vault.** Shared team logins (Onshape, the FIRST dashboard, social accounts, shop Wi-Fi). Each entry is visible to
+everyone, leads and mentors, or mentors only. Passwords are revealed one at a time, hide after 20 seconds, and are cleared
+from the clipboard after 30. **Every reveal is logged with name, time and IP.** An entry can hold a 2FA key: the server
+hands out the 6-digit code, never the key.
 
 ## Roles
 
@@ -40,7 +57,8 @@ progress for each board.
 |---|---|---|---|
 | See all boards; create, edit and finish tasks | ✓ | ✓ | ✓ |
 | Delete a task | own only | ✓ | ✓ |
-| Create, rename and archive boards and groups | | ✓ | ✓ |
+| Add subitems, post updates, @mention | ✓ | ✓ | ✓ |
+| Create boards; manage groups, columns, labels, automations; archive | | ✓ | ✓ |
 | Delete a board | | | ✓ |
 | See leadership meetings | | ✓ | ✓ |
 | See mentor meetings | | | ✓ |
@@ -91,12 +109,13 @@ Members can't see other people's emails. If your district has a data-privacy agr
 ### Other limits you should know about
 - **Self check-in trusts the device.** It proves someone had the app open while the meeting was live, not that they were in
   the room. Whoever runs the meeting can correct any entry.
-- **There are no notifications yet.** No email or push when you're assigned a task or a meeting starts.
-- **No real-time sync.** Two people editing the same board see each other's changes on refresh. Live meetings poll every
-  10 seconds for people following along.
-- **Brand colours and logo are placeholders.** The accent is a green and gold I picked, and the mark is a simple placeholder.
-  Swap in the team's official colours in `frontend/tailwind.config.js` (`ACCENT`, `GOLD`) and the official logo in
-  `frontend/src/components/BrandMark.jsx` and `frontend/public/favicon.svg`.
+- **Notifications are in-app only.** There is no email or push yet; people see the Inbox count when they open the app.
+- **Near-real-time, not real-time.** Boards refresh every 20 seconds while open, and a live meeting every 10 seconds for
+  people following along. Two people editing the same cell at once: the last save wins.
+- **One owner per task.** The built-in Owner is single on purpose (one person accountable); add a People column for
+  helpers. Subitems are one level deep.
+- **Logo.** Put the team logo at `frontend/public/brand/logo.svg` (or `logo.png`, transparent background). The sign-in page
+  shows it; small spots use the "302" mark. The brand colours are in `frontend/tailwind.config.js` (`ACCENT`, `FLAME`).
 
 ## Local development
 
@@ -114,6 +133,10 @@ npm test                            # integration tests, real SQLite, no mocks o
 `JWT_SECRET` or empty `VAULT_KEY` copied from the example gets filled in), and creates `frontend/dist`, which
 `wrangler dev` needs before its first build. The first mentor is `mentor@example.org`; to use another address, set
 `BOOTSTRAP_ADMIN_EMAIL` in `.dev.vars` before seeding.
+
+**Using it from other devices (phones, the shop laptop):** `npm run dev:lan` serves the app on your network and prints
+its address. Dev sign-in has no passwords, so this lets **anyone on that network sign in as anyone, mentors included**.
+Use it with demo data only. Plain `npm run dev` refuses other devices. For real use, deploy (below).
 
 `npm audit` in `frontend/` reports Tailwind 3's build tooling (braces, micromatch, chokidar). It runs only at
 build time on your machine and none of it ships to the browser. The fix is a Tailwind 4 migration. Don't run
@@ -150,17 +173,20 @@ migrations. This repo keeps what carried over well:
 - the AES-GCM field encryption, extended with key ids for rotation
 - the Tailwind design tokens and component styles
 
-Everything else is purpose-built. The result is about 4k lines that a student programmer can read end to end.
+Everything else is purpose-built. The result is a codebase a student programmer can read end to end.
 
 ## Layout
 
 ```
-migrations/0001_init.sql      schema (users, subteams, boards, groups, items, updates, meetings, agenda, attendance, vault, activity)
-worker/src/index.js           router, error handling, security headers
-worker/src/lib/               auth (Clerk + dev), vault crypto, TOTP, validation, audit + rate limit
-worker/src/routes/            team, boards, meetings, vault, home, auth
-worker/test/                  integration tests (node:test + node:sqlite D1 shim)
-frontend/src/pages/           Home, Boards, Board, Meetings, Meeting, Vault, Team, Activity
-frontend/src/components/      Shell, ui primitives, ItemDrawer, BrandMark
-scripts/seed-demo.mjs         demo data for local dev only
+migrations/                     0001 core schema; 0002 columns, values, subitems, history, notifications, automations
+worker/src/index.js             router, error handling, security headers, hourly due-date reminders
+worker/src/lib/items.js         every task change goes through here: history, notifications, automations
+worker/src/lib/                 auth (Clerk + dev), column validation, vault crypto, TOTP, audit + rate limit
+worker/src/routes/              boards, items, meetings, vault, team, home, auth
+worker/test/                    integration tests (node:test + a node:sqlite D1 shim)
+frontend/src/components/board/  the board: table, cells, columns, views, task panel, controls, useBoard
+frontend/src/components/ui/     ProjectPro's component library (modals, stat cards, charts, avatars, …)
+frontend/src/components/layout/ app shell, sidebar, top bar
+frontend/src/pages/             Home, My work, Inbox, Boards, Board, Meetings, Meeting, Vault, People, Audit log
+scripts/seed-demo.mjs           demo data for local dev only
 ```

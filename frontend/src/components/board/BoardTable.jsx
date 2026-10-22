@@ -9,7 +9,8 @@ import { AddColumnButton, ColumnHeader, SummaryCell } from './columns'
 import { BORDER, COLORS, SWATCH, TEXT } from '../../lib/constants'
 
 const CHECK_W = 44
-const TITLE_W = 340
+// Narrower pinned task column on phones, so the other columns are reachable.
+const titleWidth = () => (typeof window !== 'undefined' && window.innerWidth < 640 ? 190 : 340)
 const ADD_W = 44
 
 function Checkbox({ checked, indeterminate, onChange, label }) {
@@ -51,7 +52,7 @@ function GroupMenu({ group, isFirst, isLast, onRename, onColor, onMove, onDelete
   )
 }
 
-function Row({ item, sub, cols, ctx, depth, subCount, expanded, onToggleExpand, groupColor, dragProps, dropIndicator }) {
+function Row({ item, cols, ctx, titleW, depth, subCount, expanded, onToggleExpand, groupColor, dragProps, dropIndicator }) {
   const { values, users, statuses, selected, toggleSelect, actions, openItem, canEdit } = ctx
   const v = values[item.id] || {}
   const pinnedBg = selected.has(item.id) ? 'bg-accent-50' : depth ? 'bg-brand-gray-50' : 'bg-white'
@@ -63,7 +64,7 @@ function Row({ item, sub, cols, ctx, depth, subCount, expanded, onToggleExpand, 
           <span className="flex-1 flex items-center justify-center"><Checkbox checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} label={`Select ${item.title}`} /></span>
         </div>
       </td>
-      <td className={`sticky z-10 p-0 border-b border-r border-brand-gray-200 ${pinnedBg}`} style={{ left: CHECK_W, width: TITLE_W }}>
+      <td className={`sticky z-10 p-0 border-b border-r border-brand-gray-200 ${pinnedBg}`} style={{ left: CHECK_W, width: titleW }}>
         <div className="h-9 flex items-center gap-1 pr-2" style={{ paddingLeft: depth ? 28 : 4 }}>
           <span className={`w-4 shrink-0 text-brand-gray-300 ${dragProps.draggable ? 'cursor-grab opacity-0 group-hover/row:opacity-100' : 'opacity-0'}`} aria-hidden="true"><GripVertical className="w-4 h-4" /></span>
           {!depth ? (
@@ -122,6 +123,7 @@ export default function BoardTable({ groups, cols, itemsByGroup, subitemsOf, ctx
   const [drag, setDrag] = useState(null) // { id, groupId, parentId }
   const [drop, setDrop] = useState(null) // { groupId, parentId, beforeId }
   const { selected, setSelected, actions } = ctx
+  const TITLE_W = titleWidth()
   const tableWidth = CHECK_W + TITLE_W + cols.reduce((s, c) => s + c.width, 0) + ADD_W
 
   const toggle = (setFn, id) => setFn((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -218,10 +220,10 @@ export default function BoardTable({ groups, cols, itemsByGroup, subitemsOf, ctx
                         const subs = subitemsOf(item.id)
                         const isOpen = expanded.has(item.id)
                         return [
-                          <Row key={item.id} item={item} cols={cols} ctx={ctx} depth={0} subCount={subs.length} expanded={isOpen} groupColor={group.color}
+                          <Row key={item.id} titleW={TITLE_W} item={item} cols={cols} ctx={ctx} depth={0} subCount={subs.length} expanded={isOpen} groupColor={group.color}
                             onToggleExpand={() => toggle(setExpanded, item.id)} dragProps={rowDrag(item, group.id, null)} dropIndicator={isDropAt(group.id, null, item.id)} />,
                           ...(isOpen ? [
-                            ...subs.map((s) => <Row key={s.id} item={s} cols={cols} ctx={ctx} depth={1} groupColor={group.color} dragProps={rowDrag(s, group.id, item.id)} dropIndicator={isDropAt(group.id, item.id, s.id)} />),
+                            ...subs.map((s) => <Row key={s.id} titleW={TITLE_W} item={s} cols={cols} ctx={ctx} depth={1} groupColor={group.color} dragProps={rowDrag(s, group.id, item.id)} dropIndicator={isDropAt(group.id, item.id, s.id)} />),
                             <AddRow key={`${item.id}-add`} depth={1} cols={cols} groupColor={group.color} placeholder="Add subitem"
                               onAdd={(title) => actions.addItem({ parent_id: item.id, title })} dropProps={endDrop(group.id, item.id)} dropIndicator={isDropAt(group.id, item.id, null)} />,
                           ] : []),

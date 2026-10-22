@@ -129,7 +129,7 @@ export default function ItemPanel({ itemId, board, data, statuses, actions, onCl
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end bg-black/30 animate-fade-in" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       {confirmDialog}
-      <aside role="dialog" aria-label={item.title} className="glass-strong border-l w-full max-w-2xl h-full flex flex-col animate-slide-in">
+      <aside role="dialog" aria-label={item.title} className="bg-white border-l border-brand-gray-200 shadow-pop w-full max-w-2xl h-full flex flex-col animate-slide-in">
         <header className="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-brand-gray-200">
           <div className="min-w-0 flex-1">
             <p className="text-xs text-brand-gray-500 truncate">

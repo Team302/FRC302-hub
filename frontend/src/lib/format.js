@@ -1,4 +1,4 @@
-// Shared formatting + status helpers for ProjectPro.
+// Shared formatting + status helpers (ported from ProjectPro, plus 302 Hub helpers at the end).
 //
 // These consolidate the per-page inline `fmt`/`money`/`fmtDate` helpers and the
 // scattered status→color maps into one canonical source. House rules:
