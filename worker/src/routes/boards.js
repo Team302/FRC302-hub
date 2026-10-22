@@ -5,7 +5,8 @@ import { logActivity } from '../lib/activity.js'
 import { badRequest, conflict, json, newId, notFound, readBody } from '../lib/http.js'
 import { cleanSettings, COLUMN_TYPES, DEFAULT_SETTINGS } from '../lib/columns.js'
 import { STATUSES } from '../lib/items.js'
-import { deleteFilesForBoard } from './attachments.js'
+import { TRASH_DAYS } from '../lib/trash.js'
+import { deleteFilesForBoard, deleteFilesForItems } from './attachments.js'
 import * as v from '../lib/validate.js'
 import { COLORS } from './team.js'
 
@@ -119,7 +120,7 @@ export function boardRoutes(router, authed) {
               SUM(CASE WHEN i.status <> 'done' AND i.due_date < date('now') THEN 1 ELSE 0 END) AS overdue_count
          FROM boards b
          LEFT JOIN subteams s ON s.id = b.subteam_id
-         LEFT JOIN items i ON i.board_id = b.id AND i.parent_id IS NULL
+         LEFT JOIN live_items i ON i.board_id = b.id AND i.parent_id IS NULL
         WHERE b.is_archived = ?
         GROUP BY b.id ORDER BY b.created_at`
     ).bind(user.id, archived).all()
@@ -152,9 +153,9 @@ export function boardRoutes(router, authed) {
                              i.created_by, i.created_at, i.updated_at, i.completed_at, u.name AS assignee_name,
                              (SELECT COUNT(*) FROM item_updates iu WHERE iu.item_id = i.id) AS update_count,
                              (SELECT COUNT(*) FROM attachments a WHERE a.item_id = i.id) AS file_count
-                        FROM items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.board_id = ? ORDER BY i.position, i.created_at`).bind(board.id).all(),
+                        FROM live_items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.board_id = ? ORDER BY i.position, i.created_at`).bind(board.id).all(),
       env.DB.prepare('SELECT * FROM board_columns WHERE board_id = ? ORDER BY position, created_at').bind(board.id).all(),
-      env.DB.prepare('SELECT v.item_id, v.column_id, v.value FROM item_values v JOIN items i ON i.id = v.item_id WHERE i.board_id = ?').bind(board.id).all(),
+      env.DB.prepare('SELECT v.item_id, v.column_id, v.value FROM item_values v JOIN live_items i ON i.id = v.item_id WHERE i.board_id = ?').bind(board.id).all(),
       env.DB.prepare('SELECT COUNT(*) AS n FROM automations WHERE board_id = ? AND is_active = 1').bind(board.id).first(),
     ])
     const valueMap = {}
@@ -194,6 +195,25 @@ export function boardRoutes(router, authed) {
     await env.DB.prepare('DELETE FROM boards WHERE id = ?').bind(board.id).run()
     await logActivity(env, request, user, { action: 'board.delete', entity: 'board', entityId: board.id, summary: `Deleted board ${board.name}` })
     return json({ ok: true })
+  }))
+
+  // Trashed tasks on a board, newest first. A subitem that went with its parent is listed under
+  // the parent (as subitem_count), not on its own.
+  router.get('/api/boards/:id/trash', authed(async (request, env) => {
+    const board = await getBoard(env, request.params.id)
+    const { results } = await env.DB.prepare(
+      `SELECT i.id, i.title, i.parent_id, i.created_by, i.deleted_at, i.deleted_by, u.name AS deleted_by_name, g.name AS group_name,
+              p.title AS parent_title,
+              (SELECT COUNT(*) FROM items s WHERE s.parent_id = i.id AND s.deleted_at = i.deleted_at) AS subitem_count
+         FROM items i
+         LEFT JOIN users u ON u.id = i.deleted_by
+         LEFT JOIN board_groups g ON g.id = i.group_id
+         LEFT JOIN items p ON p.id = i.parent_id
+        WHERE i.board_id = ? AND i.deleted_at IS NOT NULL
+          AND NOT (p.deleted_at IS NOT NULL AND p.deleted_at = i.deleted_at)
+        ORDER BY i.deleted_at DESC, i.title LIMIT 500`
+    ).bind(board.id).all()
+    return json({ items: results, days: TRASH_DAYS })
   }))
 
   router.put('/api/boards/:id/favorite', authed(async (request, env, user) => {
@@ -243,8 +263,11 @@ export function boardRoutes(router, authed) {
     requireRole(user, 'lead')
     const group = await env.DB.prepare('SELECT * FROM board_groups WHERE id = ?').bind(request.params.id).first()
     if (!group) throw notFound('That group')
-    const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM items WHERE group_id = ? AND parent_id IS NULL').bind(group.id).first()
+    const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM live_items WHERE group_id = ? AND parent_id IS NULL').bind(group.id).first()
     if (count.n > 0) throw conflict(`Move or delete the ${count.n} task(s) in “${group.name}” first.`, 'group_not_empty')
+    // Trashed tasks in the group go with it, so their files have to go now too.
+    const { results: trashed } = await env.DB.prepare('SELECT id FROM items WHERE group_id = ?').bind(group.id).all()
+    await deleteFilesForItems(env, trashed.map((r) => r.id))
     await env.DB.prepare('DELETE FROM board_groups WHERE id = ?').bind(group.id).run()
     return json({ ok: true })
   }))

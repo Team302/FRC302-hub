@@ -53,7 +53,7 @@ export function meetingRoutes(router, authed) {
               (SELECT COUNT(*) FROM agenda_items a WHERE a.meeting_id = m.id) AS agenda_count,
               (SELECT COALESCE(SUM(minutes), 0) FROM agenda_items a WHERE a.meeting_id = m.id) AS agenda_minutes,
               (SELECT COUNT(*) FROM attendance t WHERE t.meeting_id = m.id AND t.status IN ('present', 'late')) AS present_count,
-              (SELECT COUNT(*) FROM items i WHERE i.source_meeting_id = m.id) AS action_count
+              (SELECT COUNT(*) FROM live_items i WHERE i.source_meeting_id = m.id) AS action_count
          FROM meetings m LEFT JOIN users f ON f.id = m.facilitator_id
         WHERE m.kind IN (${kinds.map(() => '?').join(', ')})
           AND ${scope === 'past' ? "m.status = 'ended'" : "m.status <> 'ended'"}
@@ -130,7 +130,7 @@ export function meetingRoutes(router, authed) {
       ).bind(meeting.id).all(),
       env.DB.prepare(
         `SELECT i.id, i.title, i.status, i.due_date, i.assignee_id, u.name AS assignee_name, i.board_id, b.name AS board_name
-           FROM items i JOIN boards b ON b.id = i.board_id LEFT JOIN users u ON u.id = i.assignee_id
+           FROM live_items i JOIN boards b ON b.id = i.board_id LEFT JOIN users u ON u.id = i.assignee_id
           WHERE i.source_meeting_id = ? ORDER BY i.created_at`
       ).bind(meeting.id).all(),
     ])
@@ -326,7 +326,7 @@ export function meetingRoutes(router, authed) {
       "SELECT u.name, t.status FROM attendance t JOIN users u ON u.id = t.user_id WHERE t.meeting_id = ? AND t.status IN ('present', 'late') ORDER BY u.name COLLATE NOCASE"
     ).bind(meeting.id).all()
     const { results: actions } = await env.DB.prepare(
-      'SELECT i.title, i.due_date, u.name AS assignee_name FROM items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.source_meeting_id = ? ORDER BY i.created_at'
+      'SELECT i.title, i.due_date, u.name AS assignee_name FROM live_items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.source_meeting_id = ? ORDER BY i.created_at'
     ).bind(meeting.id).all()
     const lines = [`# ${meeting.title} — ${meeting.starts_at.slice(0, 10)}`, '']
     lines.push(`Attendance: ${present.length} (${present.map((p) => p.name + (p.status === 'late' ? ' (late)' : '')).join(', ') || 'none recorded'})`, '')

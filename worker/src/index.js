@@ -6,6 +6,7 @@ import { Router } from 'itty-router'
 import { authenticate } from './lib/auth.js'
 import { HttpError } from './lib/http.js'
 import { sendDueReminders } from './lib/reminders.js'
+import { purgeTrash } from './lib/trash.js'
 import { attachmentRoutes } from './routes/attachments.js'
 import { authRoutes } from './routes/auth.js'
 import { boardRoutes } from './routes/boards.js'
@@ -76,6 +77,10 @@ export async function handle(request, env, ctx) {
 
 export default {
   fetch: handle,
-  // Hourly (wrangler.toml [triggers]); due-date reminders go out once per task per day.
-  scheduled: (_controller, env, ctx) => ctx.waitUntil(sendDueReminders({ ...env, waitUntil: (p) => ctx.waitUntil(p) })),
+  // Hourly (wrangler.toml [triggers]): due-date reminders (once per task per day) and emptying
+  // trash older than TRASH_DAYS. One failing doesn't stop the other.
+  scheduled: (_controller, env, ctx) => ctx.waitUntil(Promise.allSettled([
+    sendDueReminders({ ...env, waitUntil: (p) => ctx.waitUntil(p) }),
+    purgeTrash(env),
+  ]).then((rs) => rs.forEach((r) => r.status === 'rejected' && console.error('[cron]', r.reason)))),
 }

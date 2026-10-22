@@ -77,6 +77,13 @@ export default function useBoard(boardId) {
       () => (ids.length === 1 ? del(`/items/${ids[0]}`) : post('/items/bulk', { ids, action: 'delete' })),
     ),
 
+    // Undo for a delete: the tasks come back from the trash with their subitems and values.
+    restoreItems: async (ids) => {
+      const res = await mutate(null, () => post('/items/restore', { ids }))
+      if (res) await load()
+      return res
+    },
+
     bulkUpdate: (ids, changes) => mutate(
       (d) => ({ ...d, items: d.items.map((i) => (ids.includes(i.id) ? { ...i, ...(i.parent_id ? { ...changes, group_id: i.group_id } : changes) } : i)) }),
       () => post('/items/bulk', { ids, action: 'update', changes }),

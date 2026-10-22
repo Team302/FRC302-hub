@@ -9,7 +9,7 @@ export function homeRoutes(router, authed) {
     const [mine, meetings, boards, stuck] = await Promise.all([
       env.DB.prepare(
         `SELECT i.id, i.title, i.status, i.priority, i.due_date, i.board_id, b.name AS board_name, b.color AS board_color
-           FROM items i JOIN boards b ON b.id = i.board_id
+           FROM live_items i JOIN boards b ON b.id = i.board_id
           WHERE i.assignee_id = ? AND i.status <> 'done' AND b.is_archived = 0
           ORDER BY i.due_date IS NULL, i.due_date LIMIT 50`
       ).bind(user.id).all(),
@@ -23,12 +23,12 @@ export function homeRoutes(router, authed) {
                 SUM(CASE WHEN i.status = 'done' THEN 1 ELSE 0 END) AS done,
                 SUM(CASE WHEN i.status = 'stuck' THEN 1 ELSE 0 END) AS stuck,
                 SUM(CASE WHEN i.status = 'working' THEN 1 ELSE 0 END) AS working
-           FROM boards b LEFT JOIN items i ON i.board_id = b.id AND i.parent_id IS NULL
+           FROM boards b LEFT JOIN live_items i ON i.board_id = b.id AND i.parent_id IS NULL
           WHERE b.is_archived = 0 GROUP BY b.id ORDER BY b.created_at`
       ).all(),
       env.DB.prepare(
         `SELECT i.id, i.title, i.board_id, b.name AS board_name, u.name AS assignee_name, i.updated_at
-           FROM items i JOIN boards b ON b.id = i.board_id LEFT JOIN users u ON u.id = i.assignee_id
+           FROM live_items i JOIN boards b ON b.id = i.board_id LEFT JOIN users u ON u.id = i.assignee_id
           WHERE i.status = 'stuck' AND b.is_archived = 0 ORDER BY i.updated_at LIMIT 10`
       ).all(),
     ])

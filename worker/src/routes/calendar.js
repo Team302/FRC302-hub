@@ -57,7 +57,7 @@ export function calendarRoutes(router, authed) {
           WHERE starts_at >= ? AND kind IN (${kinds.map(() => '?').join(', ')}) ORDER BY starts_at LIMIT 500`
       ).bind(since, ...kinds).all(),
       env.DB.prepare(
-        `SELECT i.id, i.title, i.due_date, i.board_id, b.name AS board_name FROM items i JOIN boards b ON b.id = i.board_id
+        `SELECT i.id, i.title, i.due_date, i.board_id, b.name AS board_name FROM live_items i JOIN boards b ON b.id = i.board_id
           WHERE i.assignee_id = ? AND i.status <> 'done' AND i.due_date IS NOT NULL AND b.is_archived = 0 LIMIT 500`
       ).bind(user.id).all(),
       env.DB.prepare("SELECT id, name, starts_on, ends_on, location, url, notes FROM events WHERE ends_on >= date('now', '-60 days') ORDER BY starts_on LIMIT 200").all(),

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { BarChart3, CalendarDays, Columns3, GanttChartSquare, LayoutGrid, Plus, Search, Settings2, Star, Table2, Zap } from 'lucide-react'
+import { BarChart3, CalendarDays, Columns3, GanttChartSquare, LayoutGrid, Plus, Search, Settings2, Star, Table2, Trash2, Zap } from 'lucide-react'
 import { del } from '../lib/api'
 import { useSession } from '../context/Session'
 import { useToast } from '../context/ToastContext'
@@ -15,7 +15,7 @@ import BoardTable from '../components/board/BoardTable'
 import MobileList from '../components/board/MobileList'
 import ItemPanel from '../components/board/ItemPanel'
 import { boardColumns, ColumnEditor } from '../components/board/columns'
-import { AutomationsModal, BoardSettings, BulkBar, EMPTY_FILTER, FilterMenu, PersonFilter, SortMenu, sortItems } from '../components/board/controls'
+import { AutomationsModal, BoardSettings, BulkBar, EMPTY_FILTER, FilterMenu, PersonFilter, SortMenu, sortItems, TrashModal } from '../components/board/controls'
 import { CalendarView, ChartView, KanbanView, TimelineView } from '../components/board/views'
 
 const VIEWS = [
@@ -48,6 +48,7 @@ export default function Board() {
   const [columnEditor, setColumnEditor] = useState(null) // { type } | { column }
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [automationsOpen, setAutomationsOpen] = useState(false)
+  const [trashOpen, setTrashOpen] = useState(false)
   const [favorite, setFavorite] = useState(false)
   // Phones get the card list for the Main table unless they ask for the full table.
   const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches)
@@ -112,8 +113,11 @@ export default function Board() {
   const ctx = { values: data.values, users, statuses, selected, setSelected, toggleSelect: (sid) => setSelected((p) => { const n = new Set(p); n.has(sid) ? n.delete(sid) : n.add(sid); return n }), actions: board, openItem, canEdit: !data.board.is_archived }
 
   async function deleteSelected() {
-    const ok = await confirm({ title: `Delete ${selectedIds.length} ${selectedIds.length === 1 ? 'task' : 'tasks'}?`, message: 'Their subitems, updates and history are deleted too. This can’t be undone.', confirmLabel: 'Delete', tone: 'danger' })
-    if (ok && (await board.deleteItems(selectedIds))) { setSelected(new Set()); success(`${selectedIds.length} deleted`) }
+    const ids = selectedIds
+    if (await board.deleteItems(ids)) {
+      setSelected(new Set())
+      success(`${ids.length} ${ids.length === 1 ? 'task' : 'tasks'} moved to trash`, undefined, { action: { label: 'Undo', onClick: () => board.restoreItems(ids) } })
+    }
   }
 
   const columnHandlers = {
@@ -141,7 +145,7 @@ export default function Board() {
     remove: async (group) => {
       const count = data.items.filter((i) => i.group_id === group.id && !i.parent_id).length
       if (count) { await confirm({ title: `“${group.name}” isn’t empty`, message: `Move or delete its ${count} ${count === 1 ? 'task' : 'tasks'} first.`, confirmLabel: 'OK' }); return }
-      if (await confirm({ title: `Delete “${group.name}”?`, confirmLabel: 'Delete group', tone: 'danger' })) board.deleteGroup(group.id)
+      if (await confirm({ title: `Delete “${group.name}”?`, message: 'Any of its tasks still in the trash are deleted for good.', confirmLabel: 'Delete group', tone: 'danger' })) board.deleteGroup(group.id)
     },
   }
 
@@ -168,6 +172,7 @@ export default function Board() {
           <button type="button" className="btn-secondary btn-sm" onClick={() => setAutomationsOpen(true)}>
             <Zap className="w-4 h-4" />Automate{data.automation_count ? <span className="badge-success ml-0.5">{data.automation_count}</span> : null}
           </button>
+          <button type="button" className="btn-secondary btn-sm" onClick={() => setTrashOpen(true)} aria-label="Trash" title="Deleted tasks"><Trash2 className="w-4 h-4" /></button>
           {canManage && <button type="button" className="btn-secondary btn-sm" onClick={() => setSettingsOpen(true)}><Settings2 className="w-4 h-4" />Settings</button>}
         </div>
       </div>
@@ -243,6 +248,7 @@ export default function Board() {
             navigate('/boards')
           }} />
       )}
+      {trashOpen && <TrashModal boardId={id} me={user.id} isLead={atLeast(user, 'lead')} onClose={() => setTrashOpen(false)} onRestored={board.reload} />}
       {automationsOpen && (
         <AutomationsModal boardId={id} statuses={statuses} groups={data.groups} users={users} canManage={canManage}
           onClose={() => setAutomationsOpen(false)} onChanged={board.reload} />

@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { makeTeam } from './harness.mjs'
+import { purgeTrash } from '../src/lib/trash.js'
 
 async function setup() {
   const app = await makeTeam()
@@ -62,12 +63,17 @@ test('who can delete; files are removed from storage with their task and board',
   assert.equal((await app.call('alex', 'DELETE', `/api/attachments/${a.id}`)).status, 200)
   assert.equal(app.env.FILES.objects.size, 0)
 
-  // Subitem files go when the parent task is deleted.
+  // Subitem files stay while the parent sits in the trash, and go when the trash is emptied.
   const sub = (await app.call('alex', 'POST', '/api/items', { board_id: board.id, parent_id: item.id, title: 'Rollers' })).data.item
   await app.upload('alex', `/api/items/${item.id}/attachments`, png, { type: 'image/png', filename: 'b.png' })
   await app.upload('alex', `/api/items/${sub.id}/attachments`, png, { type: 'image/png', filename: 'c.png' })
   assert.equal(app.env.FILES.objects.size, 2)
   await app.call('alex', 'DELETE', `/api/items/${item.id}`)
+  assert.equal(app.env.FILES.objects.size, 2)
+  const [b] = [...app.env.FILES.objects.keys()]
+  assert.equal((await app.call('lead', 'GET', `/api/attachments/${b}`)).status, 404, 'files of trashed tasks are hidden')
+  app.sql("UPDATE items SET deleted_at = datetime('now', '-31 days') WHERE deleted_at IS NOT NULL")
+  assert.equal(await purgeTrash(app.env), 2)
   assert.equal(app.env.FILES.objects.size, 0)
 
   // And everything goes with a deleted board.

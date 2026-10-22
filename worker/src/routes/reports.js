@@ -85,7 +85,7 @@ export async function workloadReport(env) {
     env.DB.prepare('SELECT id, name, role, subteam_id FROM users WHERE is_active = 1 ORDER BY name COLLATE NOCASE').all(),
     env.DB.prepare(
       `SELECT i.assignee_id, i.board_id, b.name AS board_name, b.color AS board_color, i.status, i.priority, i.due_date
-         FROM items i JOIN boards b ON b.id = i.board_id
+         FROM live_items i JOIN boards b ON b.id = i.board_id
         WHERE i.status <> 'done' AND b.is_archived = 0`
     ).all(),
   ])

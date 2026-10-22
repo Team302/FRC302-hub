@@ -123,8 +123,11 @@ export default function ItemPanel({ itemId, board, data, statuses, actions, onCl
     } finally { setPosting(false) }
   }
   async function remove() {
-    if (!(await confirm({ title: `Delete “${item.title}”?`, message: subitems.length ? `Its ${subitems.length} subitems and all updates are deleted too.` : 'Its updates and history are deleted too.', confirmLabel: 'Delete', tone: 'danger' }))) return
-    if (await actions.deleteItems([itemId])) { success('Task deleted'); onClose() }
+    // No confirm: deletes go to the board's trash, and the toast offers Undo.
+    if (await actions.deleteItems([itemId])) {
+      success('Moved to trash', `“${item.title}”${subitems.length ? ` and its ${subitems.length} subitems` : ''}`, { action: { label: 'Undo', onClick: () => actions.restoreItems([itemId]) } })
+      onClose()
+    }
   }
 
   return createPortal(
@@ -146,7 +149,7 @@ export default function ItemPanel({ itemId, board, data, statuses, actions, onCl
             )}
           </div>
           <button type="button" className="btn-icon" title="Duplicate" aria-label="Duplicate task" onClick={async () => { if (await actions.duplicate([item.id])) success('Task duplicated') }}><Copy className="w-4 h-4" /></button>
-          {canDelete && <button type="button" className="btn-icon" title="Delete" aria-label="Delete task" onClick={remove}><Trash2 className="w-4 h-4" /></button>}
+          {canDelete && <button type="button" className="btn-icon" title="Move to trash" aria-label="Move task to trash" onClick={remove}><Trash2 className="w-4 h-4" /></button>}
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close"><X className="w-4 h-4" /></button>
         </header>
 

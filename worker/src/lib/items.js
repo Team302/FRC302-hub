@@ -15,7 +15,7 @@ export const ITEM_COLUMNS = `i.id, i.board_id, i.group_id, i.parent_id, i.title,
   u.name AS assignee_name, (SELECT COUNT(*) FROM item_updates iu WHERE iu.item_id = i.id) AS update_count`
 
 export async function getItem(env, id) {
-  const item = await env.DB.prepare(`SELECT ${ITEM_COLUMNS} FROM items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.id = ?`).bind(id).first()
+  const item = await env.DB.prepare(`SELECT ${ITEM_COLUMNS} FROM live_items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.id = ?`).bind(id).first()
   if (!item) throw notFound('That task')
   return item
 }
@@ -53,7 +53,7 @@ export async function createItem(env, user, fields, depth = 0) {
   if (board.is_archived) throw conflict('That board is archived.')
   let groupId = fields.group_id
   if (fields.parent_id) {
-    const parent = await env.DB.prepare('SELECT id, board_id, group_id, parent_id FROM items WHERE id = ?').bind(fields.parent_id).first()
+    const parent = await env.DB.prepare('SELECT id, board_id, group_id, parent_id FROM live_items WHERE id = ?').bind(fields.parent_id).first()
     if (!parent || parent.board_id !== board.id) throw badRequest('That parent task is not on this board.')
     if (parent.parent_id) throw badRequest('Subitems can’t have their own subitems.')
     groupId = parent.group_id
@@ -166,7 +166,7 @@ async function runAutomations(env, user, board, item, trigger, depth) {
     let a
     try { t = JSON.parse(rule.trigger); a = JSON.parse(rule.action) } catch { continue }
     if (t.type !== trigger.type || (t.type === 'status_to' && t.status !== trigger.status)) continue
-    const current = await env.DB.prepare(`SELECT ${ITEM_COLUMNS} FROM items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.id = ?`).bind(item.id).first()
+    const current = await env.DB.prepare(`SELECT ${ITEM_COLUMNS} FROM live_items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.id = ?`).bind(item.id).first()
     if (!current) return
     // Automations act as the person whose change triggered them, so history shows who started it.
     try {

@@ -1,13 +1,15 @@
 // Board controls: the toolbar filters (person, filter, sort), the bulk-action bar, board settings
 // and automations.
 import { useEffect, useState } from 'react'
-import { ArrowDownUp, Copy, Filter, FolderInput, Plus, Trash2, UserRound, X, Zap } from 'lucide-react'
+import { ArrowDownUp, Copy, Filter, FolderInput, Plus, RotateCcw, Trash2, UserRound, X, Zap } from 'lucide-react'
 import Popover from './Popover'
 import { Fill } from './cells'
 import Avatar from '../ui/Avatar'
 import Modal from '../ui/Modal'
 import { del, get, patch, post } from '../../lib/api'
 import { PRIORITIES, STATUSES } from '../../lib/constants'
+import { parseServerTime, relative } from '../../lib/format'
+import EmptyState from '../ui/EmptyState'
 
 const pill = (on) => `btn-sm ${on ? 'btn-secondary ring-1 ring-accent-500/60 text-accent-700' : 'btn-ghost'}`
 
@@ -296,6 +298,51 @@ export function AutomationsModal({ boardId, statuses, groups, users, canManage, 
           </form>
         ) : <p className="text-xs text-brand-gray-500">Leads and mentors can add automations.</p>}
       </div>
+    </Modal>
+  )
+}
+
+// Deleted tasks on this board. Restoring needs a lead, the task's creator, or whoever deleted it,
+// the same people the server allows.
+export function TrashModal({ boardId, me, isLead, onClose, onRestored }) {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState('')
+  const load = () => get(`/boards/${boardId}/trash`).then(setData).catch((e) => setError(e.message))
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function restore(id) {
+    setError('')
+    try { await post(`/items/${id}/restore`); await load(); onRestored() } catch (e) { setError(e.message) }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Trash" size="lg">
+      <p className="text-sm text-brand-gray-500 -mt-1 mb-4">Deleted tasks stay here for {data?.days ?? 30} days, then they and their files are gone for good.</p>
+      {error && <p className="text-sm text-status-danger mb-3" role="alert">{error}</p>}
+      {!data ? <p className="text-sm text-brand-gray-500">Loading…</p> : data.items.length === 0 ? (
+        <EmptyState icon={Trash2} title="The trash is empty" message="Tasks you delete from this board land here first." />
+      ) : (
+        <ul className="divide-y divide-brand-gray-100 -mx-1 max-h-[60vh] overflow-y-auto">
+          {data.items.map((i) => {
+            const allowed = isLead || i.created_by === me || i.deleted_by === me
+            return (
+              <li key={i.id} className="flex items-center gap-3 px-1 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-brand-black truncate">{i.title}</p>
+                  <p className="text-xs text-brand-gray-500 truncate">
+                    {i.parent_title ? `Subitem of “${i.parent_title}”` : i.group_name}
+                    {i.subitem_count ? ` · ${i.subitem_count} ${i.subitem_count === 1 ? 'subitem' : 'subitems'}` : ''}
+                    {` · deleted ${relative(parseServerTime(i.deleted_at))}${i.deleted_by_name ? ` by ${i.deleted_by_name}` : ''}`}
+                  </p>
+                </div>
+                <button type="button" className="btn-secondary btn-sm shrink-0" disabled={!allowed} title={allowed ? undefined : 'A lead, its creator, or whoever deleted it can restore it'} onClick={() => restore(i.id)}>
+                  <RotateCcw className="w-3.5 h-3.5" />Restore
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </Modal>
   )
 }

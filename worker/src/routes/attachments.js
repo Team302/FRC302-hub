@@ -97,7 +97,7 @@ export function attachmentRoutes(router, authed) {
 
   router.get('/api/attachments/:id', authed(async (request, env) => {
     requireStorage(env)
-    const row = await env.DB.prepare('SELECT * FROM attachments WHERE id = ?').bind(request.params.id).first()
+    const row = await env.DB.prepare('SELECT a.* FROM attachments a JOIN live_items i ON i.id = a.item_id WHERE a.id = ?').bind(request.params.id).first()
     if (!row) throw notFound('That file')
     const object = await env.FILES.get(row.id)
     if (!object) throw notFound('That file')
@@ -112,7 +112,7 @@ export function attachmentRoutes(router, authed) {
   }))
 
   router.delete('/api/attachments/:id', authed(async (request, env, user) => {
-    const row = await env.DB.prepare('SELECT * FROM attachments WHERE id = ?').bind(request.params.id).first()
+    const row = await env.DB.prepare('SELECT a.* FROM attachments a JOIN live_items i ON i.id = a.item_id WHERE a.id = ?').bind(request.params.id).first()
     if (!row) throw notFound('That file')
     if (row.uploaded_by !== user.id && !atLeast(user, 'lead')) throw forbidden('Only the person who uploaded a file, or a lead, can delete it.')
     if (env.FILES) await env.FILES.delete(row.id)

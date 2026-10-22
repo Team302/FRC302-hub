@@ -15,7 +15,7 @@ export async function notify(env, { userIds, actorId = null, kind, itemId = null
   if (!pushConfigured(env)) return
   // Push is sent after the response when the runtime allows it (env.waitUntil, set per request
   // in index.js), so a slow push service never slows down the person's click.
-  const item = itemId ? await env.DB.prepare('SELECT board_id FROM items WHERE id = ?').bind(itemId).first() : null
+  const item = itemId ? await env.DB.prepare('SELECT board_id FROM live_items WHERE id = ?').bind(itemId).first() : null
   const message = { title: PUSH_TITLE[kind] || 'Team 302', body: text, url: item ? `/boards/${item.board_id}?item=${itemId}` : '/inbox', tag: `${kind}:${itemId || ''}` }
   const delivery = Promise.all(targets.map((uid) => pushToUser(env, uid, message)))
   if (env.waitUntil) env.waitUntil(delivery)

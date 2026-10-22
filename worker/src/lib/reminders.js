@@ -9,7 +9,7 @@ export async function sendDueReminders(env, now = new Date()) {
   const tomorrow = isoDay(new Date(now.getTime() + 86400000))
   const { results } = await env.DB.prepare(
     `SELECT i.id, i.title, i.due_date, i.assignee_id, b.name AS board_name
-       FROM items i JOIN boards b ON b.id = i.board_id JOIN users u ON u.id = i.assignee_id
+       FROM live_items i JOIN boards b ON b.id = i.board_id JOIN users u ON u.id = i.assignee_id
       WHERE i.status <> 'done' AND b.is_archived = 0 AND u.is_active = 1 AND i.due_date IS NOT NULL AND i.due_date <= ?
         AND NOT EXISTS (SELECT 1 FROM reminder_log r WHERE r.item_id = i.id AND r.day = ?)
       LIMIT 500`

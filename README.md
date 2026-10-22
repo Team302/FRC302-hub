@@ -34,6 +34,9 @@ Ordered → Received, with vendor, link, quantity, cost totals per group and tra
 - **Automations:** "when status changes to Done, move it to Testing", "when Stuck, notify a mentor", "when a task is
   created, assign it to …". Loops are capped.
 - **Favorites** pin boards to the top of the sidebar.
+- **Trash with Undo.** Deleting a task (or a bulk selection) shows an Undo; deleted tasks wait in the board's Trash for
+  30 days with their subitems, values, updates and files, then the hourly job removes them for good. A lead, the task's
+  creator, or whoever deleted it can restore it. Deleting a group or a board is still immediate.
 
 **Inbox.** Notifications when you're assigned, added to a people column, @mentioned, when someone updates or changes the
 status of a task you own, automation alerts, and due-date reminders (hourly job, once per task per day). The unread count

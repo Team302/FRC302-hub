@@ -3,10 +3,10 @@
 // the item's creator. All edits go through lib/items.js.
 import { atLeast } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
-import { badRequest, forbidden, json, newId, notFound, readBody } from '../lib/http.js'
+import { badRequest, conflict, forbidden, json, newId, notFound, readBody } from '../lib/http.js'
 import { createItem, getItem, ITEM_COLUMNS, PRIORITIES, setValue, STATUSES, updateItem } from '../lib/items.js'
 import { notify, resolveMentions } from '../lib/notify.js'
-import { deleteFilesForItems } from './attachments.js'
+import { sqlNow } from '../lib/trash.js'
 import * as v from '../lib/validate.js'
 
 const MAX_BULK = 200
@@ -31,17 +31,38 @@ async function getColumn(env, id) {
   return column
 }
 
+// Deleting moves a task (and its live subitems) to the board's trash. They share one deleted_at
+// stamp, which is how restore knows which subitems went with the parent. lib/trash.js purges
+// the trash after TRASH_DAYS, and only then are the rows and their files really gone.
 async function deleteItem(env, request, user, item) {
   if (!canDelete(user, item)) throw forbidden('Only a lead, or the person who created it, can delete a task.')
-  await deleteFilesForItems(env, [item.id])
-  await env.DB.prepare('DELETE FROM items WHERE id = ?').bind(item.id).run()
-  await logActivity(env, request, user, { action: 'item.delete', entity: 'item', entityId: item.id, summary: `Deleted task “${item.title}”` })
+  const stamp = sqlNow()
+  await env.DB.batch([
+    env.DB.prepare('UPDATE items SET deleted_at = ?, deleted_by = ? WHERE (id = ? OR parent_id = ?) AND deleted_at IS NULL').bind(stamp, user.id, item.id, item.id),
+    env.DB.prepare("INSERT INTO item_events (item_id, actor_id, field, old_value, new_value) VALUES (?, ?, 'deleted', NULL, NULL)").bind(item.id, user.id),
+  ])
+  await logActivity(env, request, user, { action: 'item.delete', entity: 'item', entityId: item.id, summary: `Moved task “${item.title}” to the trash` })
+}
+
+async function restoreItem(env, request, user, id) {
+  const item = await env.DB.prepare('SELECT * FROM items WHERE id = ? AND deleted_at IS NOT NULL').bind(id).first()
+  if (!item) throw notFound('That task in the trash')
+  if (!canDelete(user, item) && item.deleted_by !== user.id) throw forbidden('Only a lead, the person who deleted it, or its creator can restore a task.')
+  if (item.parent_id && !(await env.DB.prepare('SELECT 1 FROM live_items WHERE id = ?').bind(item.parent_id).first())) {
+    throw conflict('Its parent task is in the trash. Restore the parent first.')
+  }
+  await env.DB.batch([
+    env.DB.prepare('UPDATE items SET deleted_at = NULL, deleted_by = NULL WHERE id = ? OR (parent_id = ? AND deleted_at = ?)').bind(item.id, item.id, item.deleted_at),
+    env.DB.prepare("INSERT INTO item_events (item_id, actor_id, field, old_value, new_value) VALUES (?, ?, 'restored', NULL, NULL)").bind(item.id, user.id),
+  ])
+  await logActivity(env, request, user, { action: 'item.restore', entity: 'item', entityId: item.id, summary: `Restored task “${item.title}” from the trash` })
+  return getItem(env, item.id)
 }
 
 async function duplicateItem(env, user, item) {
   const copy = await createItem(env, user, { ...item, title: `${item.title} (copy)`, status: 'not_started', parent_id: item.parent_id, source_meeting_id: null, position: item.position })
   const { results: values } = await env.DB.prepare('SELECT column_id, value FROM item_values WHERE item_id = ?').bind(item.id).all()
-  const { results: subs } = await env.DB.prepare('SELECT * FROM items WHERE parent_id = ? ORDER BY position').bind(item.id).all()
+  const { results: subs } = await env.DB.prepare('SELECT * FROM live_items WHERE parent_id = ? ORDER BY position').bind(item.id).all()
   const stmts = values.map((r) => env.DB.prepare('INSERT INTO item_values (item_id, column_id, value) VALUES (?, ?, ?)').bind(copy.id, r.column_id, r.value))
   for (const s of subs) {
     stmts.push(env.DB.prepare(
@@ -78,8 +99,8 @@ export function itemRoutes(router, authed) {
         `SELECT e.id, e.field, e.old_value, e.new_value, e.created_at, u.name AS actor_name
            FROM item_events e LEFT JOIN users u ON u.id = e.actor_id WHERE e.item_id = ? ORDER BY e.id DESC LIMIT 200`
       ).bind(item.id).all(),
-      env.DB.prepare(`SELECT ${ITEM_COLUMNS} FROM items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.parent_id = ? ORDER BY i.position, i.created_at`).bind(item.id).all(),
-      item.parent_id ? env.DB.prepare('SELECT id, title FROM items WHERE id = ?').bind(item.parent_id).first() : null,
+      env.DB.prepare(`SELECT ${ITEM_COLUMNS} FROM live_items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.parent_id = ? ORDER BY i.position, i.created_at`).bind(item.id).all(),
+      item.parent_id ? env.DB.prepare('SELECT id, title FROM live_items WHERE id = ?').bind(item.parent_id).first() : null,
       item.source_meeting_id ? env.DB.prepare('SELECT id, title, starts_at FROM meetings WHERE id = ?').bind(item.source_meeting_id).first() : null,
     ])
     return json({ item, updates, events, subitems, parent, meeting })
@@ -103,6 +124,26 @@ export function itemRoutes(router, authed) {
   router.delete('/api/items/:id', authed(async (request, env, user) => {
     await deleteItem(env, request, user, await getItem(env, request.params.id))
     return json({ ok: true })
+  }))
+
+  router.post('/api/items/:id/restore', authed(async (request, env, user) => {
+    return json({ item: await restoreItem(env, request, user, request.params.id) })
+  }))
+
+  // Bulk restore backs the Undo on a bulk delete. Each id is checked on its own.
+  router.post('/api/items/restore', authed(async (request, env, user) => {
+    const body = await readBody(request)
+    if (!Array.isArray(body.ids) || !body.ids.length || body.ids.length > MAX_BULK) throw badRequest(`Select 1–${MAX_BULK} tasks.`)
+    const ids = [...new Set(body.ids)].map((id) => v.id(id, 'Task', { nullable: false }))
+    const ph = ids.map(() => '?').join(', ')
+    // Parents first, so a subitem selected alongside its parent isn't refused; anything already
+    // back (it came back with its parent) is skipped.
+    const { results } = await env.DB.prepare(`SELECT id FROM items WHERE id IN (${ph}) AND deleted_at IS NOT NULL ORDER BY parent_id IS NOT NULL`).bind(...ids).all()
+    const items = []
+    for (const { id } of results) {
+      if (await env.DB.prepare('SELECT 1 FROM items WHERE id = ? AND deleted_at IS NOT NULL').bind(id).first()) items.push(await restoreItem(env, request, user, id))
+    }
+    return json({ items })
   }))
 
   router.post('/api/items/:id/duplicate', authed(async (request, env, user) => {
@@ -186,7 +227,7 @@ export function itemRoutes(router, authed) {
   router.get('/api/my-work', authed(async (_req, env, user) => {
     const { results } = await env.DB.prepare(
       `SELECT ${ITEM_COLUMNS}, b.name AS board_name, b.color AS board_color, p.title AS parent_title
-         FROM items i JOIN boards b ON b.id = i.board_id LEFT JOIN users u ON u.id = i.assignee_id LEFT JOIN items p ON p.id = i.parent_id
+         FROM live_items i JOIN boards b ON b.id = i.board_id LEFT JOIN users u ON u.id = i.assignee_id LEFT JOIN live_items p ON p.id = i.parent_id
         WHERE i.assignee_id = ? AND i.status <> 'done' AND b.is_archived = 0
         ORDER BY i.due_date IS NULL, i.due_date, CASE i.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END`
     ).bind(user.id).all()
@@ -198,7 +239,7 @@ export function itemRoutes(router, authed) {
     const [{ results }, unread] = await Promise.all([
       env.DB.prepare(
         `SELECT n.id, n.kind, n.body, n.item_id, n.read_at, n.created_at, a.name AS actor_name, i.board_id
-           FROM notifications n LEFT JOIN users a ON a.id = n.actor_id LEFT JOIN items i ON i.id = n.item_id
+           FROM notifications n LEFT JOIN users a ON a.id = n.actor_id LEFT JOIN live_items i ON i.id = n.item_id
           WHERE n.user_id = ? ORDER BY n.id DESC LIMIT 50`
       ).bind(user.id).all(),
       env.DB.prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL').bind(user.id).first(),
@@ -230,7 +271,7 @@ export function itemRoutes(router, authed) {
     const [boards, items, meetings] = await Promise.all([
       env.DB.prepare("SELECT id, name, color FROM boards WHERE name LIKE ? ESCAPE '\\' AND is_archived = 0 LIMIT 5").bind(like).all(),
       env.DB.prepare(
-        `SELECT i.id, i.title, i.status, i.board_id, b.name AS board_name FROM items i JOIN boards b ON b.id = i.board_id
+        `SELECT i.id, i.title, i.status, i.board_id, b.name AS board_name FROM live_items i JOIN boards b ON b.id = i.board_id
           WHERE i.title LIKE ? ESCAPE '\\' AND b.is_archived = 0 ORDER BY i.status = 'done', i.updated_at DESC LIMIT 10`
       ).bind(like).all(),
       env.DB.prepare(
