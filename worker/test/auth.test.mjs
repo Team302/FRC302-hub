@@ -27,9 +27,12 @@ test('dev login is refused in production, off-localhost, or without DEV_LOGIN', 
   }
   const app = await makeTeam()
   const { handle } = await import('../src/index.js')
-  const res = await handle(
-    new Request('http://hub.example.org/api/auth/dev-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'mentor@example.org' }) }), app.env, {})
-  assert.equal(res.status, 404)
+  const byAddress = () => new Request('http://10.110.163.243:5173/api/auth/dev-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'mentor@example.org' }) })
+  const refused = await handle(byAddress(), app.env, {})
+  assert.equal(refused.status, 403)
+  assert.match((await refused.json()).error, /npm run dev:lan/)
+  app.env.DEV_LOGIN_LAN = 'on'
+  assert.equal((await handle(byAddress(), app.env, {})).status, 200)
 })
 
 test('bootstrap admin only works on a team with no admin', async () => {

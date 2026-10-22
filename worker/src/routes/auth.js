@@ -5,15 +5,17 @@ import * as v from '../lib/validate.js'
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
 
-// Dev sign-in has no password, so it only answers this machine. A request through the Vite dev
-// proxy looks local to the worker; the proxy names the real device in X-Dev-Client-Address
-// (frontend/vite.config.js). DEV_LOGIN_LAN=on (npm run dev:lan) lets other devices in on purpose.
+// Dev sign-in has no password, so by default it only answers the computer running the server.
+// Two signs of another device: the app was opened by a network address instead of localhost, or
+// the Vite dev proxy reports a non-loopback client (X-Dev-Client-Address, frontend/vite.config.js;
+// a proxied request otherwise looks local). DEV_LOGIN_LAN=on (npm run dev:lan) lets them in on purpose.
+const LAN_REFUSED = 'Development sign-in only works on the computer running the server (open http://localhost:5173 there). To allow other devices on this network, restart it with npm run dev:lan.'
+
 function assertDevRequest(request, env) {
-  if (!devLoginEnabled(env) || !LOCAL_HOSTS.has(new URL(request.url).hostname)) throw notFound('That page')
+  if (!devLoginEnabled(env)) throw notFound('That page')
+  if (env.DEV_LOGIN_LAN === 'on') return
   const client = request.headers.get('X-Dev-Client-Address')
-  if (client && !LOOPBACK.has(client) && env.DEV_LOGIN_LAN !== 'on') {
-    throw forbidden('Development sign-in only works on the computer running the server. To allow other devices, start it with npm run dev:lan.')
-  }
+  if (!LOCAL_HOSTS.has(new URL(request.url).hostname) || (client && !LOOPBACK.has(client))) throw forbidden(LAN_REFUSED)
 }
 
 export function authRoutes(router) {
