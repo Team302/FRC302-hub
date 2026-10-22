@@ -2,7 +2,7 @@
 // pane: favorites first, then every other active board.
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Home, Inbox, KeyRound, LayoutGrid, ListChecks, Plus, ScrollText, Star, Users, X } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Clock, Home, Inbox, KeyRound, LayoutGrid, ListChecks, Plus, ScrollText, Star, Users, X } from 'lucide-react'
 import { useSession } from '../../context/Session'
 import { atLeast, ROLE, SWATCH } from '../../lib/constants'
 import { useIsDesktop } from '../detail/detailUtils'
@@ -77,6 +77,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen = false, onClo
         <NavRow to="/meetings" icon={CalendarDays} label="Meetings" collapsed={collapsed} onNavigate={onClose} />
         <NavRow to="/vault" icon={KeyRound} label="Vault" collapsed={collapsed} onNavigate={onClose} />
         <NavRow to="/team" icon={Users} label="People" collapsed={collapsed} onNavigate={onClose} />
+        {atLeast(user, 'lead') && <NavRow to="/attendance" icon={Clock} label="Attendance" collapsed={collapsed} onNavigate={onClose} />}
         {atLeast(user, 'admin') && <NavRow to="/activity" icon={ScrollText} label="Audit log" collapsed={collapsed} onNavigate={onClose} />}
 
         <GroupLabel collapsed={collapsed} action={(

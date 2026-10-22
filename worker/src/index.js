@@ -8,9 +8,11 @@ import { HttpError } from './lib/http.js'
 import { sendDueReminders } from './lib/reminders.js'
 import { authRoutes } from './routes/auth.js'
 import { boardRoutes } from './routes/boards.js'
+import { calendarRoutes } from './routes/calendar.js'
 import { homeRoutes } from './routes/home.js'
 import { itemRoutes } from './routes/items.js'
 import { meetingRoutes } from './routes/meetings.js'
+import { reportRoutes } from './routes/reports.js'
 import { teamRoutes } from './routes/team.js'
 import { vaultRoutes } from './routes/vault.js'
 
@@ -33,6 +35,8 @@ export function buildRouter() {
   meetingRoutes(router, authed)
   vaultRoutes(router, authed)
   homeRoutes(router, authed)
+  calendarRoutes(router, authed)
+  reportRoutes(router, authed)
   router.get('/api/health', () => Response.json({ ok: true }))
   router.all('/api/*', () => { throw new HttpError(404, 'No such API route.', 'not_found') })
   return router

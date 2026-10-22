@@ -23,7 +23,8 @@ export function DueText({ due, done }) {
 export default function Home() {
   const { user, openNew } = useSession()
   const [data, setData] = useState(null)
-  useEffect(() => { get('/home').then(setData) }, [])
+  const [hours, setHours] = useState(null)
+  useEffect(() => { get('/home').then(setData); get('/me/attendance').then((d) => setHours(d.me)).catch(() => {}) }, [])
 
   const today = todayIso()
   const weekEnd = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
@@ -49,8 +50,8 @@ export default function Home() {
           <div className="grid gap-4 grid-cols-2 xl:grid-cols-4 mb-6">
             <Stagger>
               <StatCard title="My open tasks" icon={ListChecks} value={data.my_items.length} sub="Assigned to you" />
-              <StatCard title="Due in 7 days" icon={Clock} value={dueThisWeek} sub="Yours" />
-              <StatCard title="Overdue" icon={AlertOctagon} value={data.overdue_count} tone={data.overdue_count ? 'danger' : undefined} sub="Yours" />
+              <StatCard title="My hours this season" icon={Clock} value={hours ? hours.hours : '—'} sub={hours?.rate != null ? `${hours.rate}% attendance · ${hours.attended} meetings` : 'From meetings you checked in to'} />
+              <StatCard title="Overdue" icon={AlertOctagon} value={data.overdue_count} tone={data.overdue_count ? 'danger' : undefined} sub={dueThisWeek ? `${dueThisWeek} more due in 7 days` : 'Yours'} />
               <StatCard title="Next meeting" icon={CalendarDays} value={next ? new Date(next.starts_at).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : '—'} sub={next ? `${fmtTime(new Date(next.starts_at))} · ${next.title}` : 'Nothing scheduled'} />
             </Stagger>
           </div>

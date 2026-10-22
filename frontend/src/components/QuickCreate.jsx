@@ -90,13 +90,14 @@ function nextEvening() {
 export function MeetingForm({ submit: run }) {
   const { user, users, subteams } = useSession()
   const [past, setPast] = useState([])
-  const [form, setForm] = useState({ title: '', kind: 'general', starts_at: toLocalInput(nextEvening()), duration_min: 60, location: '', facilitator_id: user.id, subteam_id: '', copy_agenda_from: '' })
+  const [form, setForm] = useState({ title: '', kind: 'general', starts_at: toLocalInput(nextEvening()), duration_min: 60, location: '', facilitator_id: user.id, subteam_id: '', copy_agenda_from: '', repeat: false, repeat_until: '' })
   const navigate = useNavigate()
   useEffect(() => { get('/meetings?scope=past').then((d) => setPast(d.meetings)).catch(() => {}) }, [])
   const submit = (e) => run(e, async () => {
-    const res = await post('/meetings', { ...form, starts_at: fromLocalInput(form.starts_at), duration_min: Number(form.duration_min), subteam_id: form.subteam_id || null, copy_agenda_from: form.copy_agenda_from || undefined })
+    const { repeat, repeat_until: until, ...rest } = form
+    const res = await post('/meetings', { ...rest, starts_at: fromLocalInput(form.starts_at), duration_min: Number(form.duration_min), subteam_id: form.subteam_id || null, copy_agenda_from: form.copy_agenda_from || undefined, repeat_until: repeat && until ? until : undefined })
     navigate(`/meetings/${res.meeting.id}`)
-    return 'Meeting scheduled'
+    return res.created > 1 ? `${res.created} weekly meetings scheduled` : 'Meeting scheduled'
   })
   return (
     <form id="quick-create" onSubmit={submit} className="space-y-4">
@@ -106,6 +107,10 @@ export function MeetingForm({ submit: run }) {
         <Field label="Subteam"><select className="input" value={form.subteam_id} onChange={(e) => setForm({ ...form, subteam_id: e.target.value })}><option value="">—</option>{subteams.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
         <Field label="Starts"><input type="datetime-local" className="input" required value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} /></Field>
         <Field label="Length (minutes)"><input type="number" min={5} max={600} className="input" value={form.duration_min} onChange={(e) => setForm({ ...form, duration_min: e.target.value })} /></Field>
+      </div>
+      <div className="rounded-xl border border-brand-gray-200 p-3 space-y-2">
+        <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={form.repeat} onChange={(e) => setForm({ ...form, repeat: e.target.checked })} />Repeat every week</label>
+        {form.repeat && <Field label="Until" hint="Same time each week, up to 52 meetings. Each one gets its own agenda and attendance."><input type="date" className="input" required min={form.starts_at.slice(0, 10)} value={form.repeat_until} onChange={(e) => setForm({ ...form, repeat_until: e.target.value })} /></Field>}
       </div>
       <Field label="Location"><input className="input" maxLength={120} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Shop, room 302, Discord…" /></Field>
       <Field label="Facilitator" hint="Runs the agenda and takes attendance."><select className="input" value={form.facilitator_id} onChange={(e) => setForm({ ...form, facilitator_id: e.target.value })}>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></Field>

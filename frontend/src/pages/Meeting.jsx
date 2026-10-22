@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowDown, ArrowUp, CalendarDays, Check, ClipboardCopy, Flag, MapPin, Play, Plus, Printer, SkipForward, Square, Timer, Trash2, User, UserCheck } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarDays, Check, ClipboardCopy, Flag, MapPin, Play, Plus, Printer, Repeat, SkipForward, Square, Timer, Trash2, User, UserCheck } from 'lucide-react'
 import { del, get, patch, post, put } from '../lib/api'
 import { useSession } from '../context/Session'
 import { useToast } from '../context/ToastContext'
@@ -330,6 +330,11 @@ export default function Meeting() {
     if (!(await confirm({ title: 'Delete this meeting?', message: 'Action items already on boards are kept.', confirmLabel: 'Delete', tone: 'danger' }))) return
     if (await run(() => del(`/meetings/${meeting.id}`), 'Meeting deleted')) navigate('/meetings')
   }
+  const removeFollowing = async () => {
+    if (!(await confirm({ title: 'Delete the rest of this series?', message: 'This meeting and every later one in the series that hasn’t started are deleted.', confirmLabel: 'Delete series', tone: 'danger' }))) return
+    const res = await run(() => del(`/meetings/${meeting.id}/following`))
+    if (res) { success(`${res.deleted} meetings deleted`); navigate('/meetings') }
+  }
 
   return (
     <div>
@@ -348,9 +353,15 @@ export default function Meeting() {
             {meeting.location && <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-brand-gray-400" />{meeting.location}</span>}
             <span className="flex items-center gap-1.5"><User className="w-4 h-4 text-brand-gray-400" />{meeting.facilitator_name || 'No facilitator'}</span>
             <span className="badge-gray">{MEETING_KIND[meeting.kind]?.label}</span>
+            {meeting.series_id && <span className="badge-info"><Repeat className="w-3 h-3" />Weekly</span>}
           </div>
         </div>
-        {atLeast(user, 'lead') && <button className="btn-ghost btn-sm" onClick={remove}><Trash2 className="w-4 h-4" />Delete</button>}
+        {atLeast(user, 'lead') && (
+          <div className="flex gap-1">
+            {meeting.series_id && meeting.status === 'scheduled' && <button className="btn-ghost btn-sm" onClick={removeFollowing}><Repeat className="w-4 h-4" />Delete this and later</button>}
+            <button className="btn-ghost btn-sm" onClick={remove}><Trash2 className="w-4 h-4" />Delete</button>
+          </div>
+        )}
       </div>
       <SegmentedControl className="mb-6" size="md" aria-label="Meeting sections" value={tab} onChange={setTab} options={[
         { value: 'plan', label: 'Agenda' }, { value: 'run', label: meeting.status === 'live' ? 'Run · live' : 'Run' }, { value: 'recap', label: 'Recap' },

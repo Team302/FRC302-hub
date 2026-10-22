@@ -96,6 +96,43 @@ const { meeting: m2 } = await call(lead, 'POST', '/meetings', { title: 'Build se
 for (const [title, minutes] of [['What shipped today', 5], ['Blockers', 10], ['Tomorrow’s plan', 5]]) await call(lead, 'POST', `/meetings/${m2.id}/agenda`, { title, minutes })
 await call(lead, 'POST', `/meetings/${m2.id}/start`)
 
+// A season's worth of past build sessions with attendance, so People → Attendance has data.
+const roster = Object.values(ids)
+for (let w = 6; w >= 1; w--) {
+  const when = new Date(); when.setDate(when.getDate() - w * 7); when.setHours(15, 0, 0, 0)
+  const { meeting: past } = await call(lead, 'POST', '/meetings', { title: 'Saturday build session', kind: 'build', starts_at: when.toISOString(), duration_min: 240, location: 'Shop' })
+  await call(lead, 'POST', `/meetings/${past.id}/agenda`, { title: 'Build', minutes: 220 })
+  await call(lead, 'POST', `/meetings/${past.id}/start`)
+  for (const [i, uid] of [...roster, me.id].entries()) {
+    const roll = (i * 7 + w * 3) % 10
+    const status = roll < 6 ? 'present' : roll < 7 ? 'late' : roll < 8 ? 'excused' : 'absent'
+    await call(lead, 'PUT', `/meetings/${past.id}/attendance/${uid}`, { status })
+  }
+  await call(lead, 'POST', `/meetings/${past.id}/end`)
+}
+// Weekly all-hands for the next two months.
+const tue = new Date(); tue.setDate(tue.getDate() + ((9 - tue.getDay()) % 7 || 7)); tue.setHours(18, 30, 0, 0)
+const until = new Date(tue); until.setDate(until.getDate() + 56)
+await call(lead, 'POST', '/meetings', { title: 'Weekly all-hands', starts_at: tue.toISOString(), duration_min: 45, location: 'Room 302', repeat_until: until.toISOString().slice(0, 10), copy_agenda_from: meeting.id })
+
+// Parts & purchasing board.
+{
+  const { board } = await call(lead, 'POST', '/boards', { name: 'Parts & purchasing', subteam_id: 'st_biz', color: 'amber', template: 'purchasing' })
+  const full = await call(lead, 'GET', `/boards/${board.id}`)
+  const col = Object.fromEntries(full.columns.map((c) => [c.title, c]))
+  const vendor = (name) => [col.Vendor.settings.options.find((o) => o.label === name).id]
+  for (const [title, g, v, qty, cost, who] of [
+    ['MK4i swerve modules (L2)', 3, 'Other', 4, 1196, 'Jordan'], ['NEO Vortex motors', 2, 'REV', 8, 400, 'Jordan'],
+    ['1/8" polycarbonate sheet', 1, 'McMaster-Carr', 2, 96.5, 'Marcus'], ['CANcoder', 0, 'CTRE', 4, 260, 'Ava'],
+    ['Bearings, 1/2" hex', 0, 'WCP', 20, 59, 'Marcus'], ['Battery (MK ES17-12)', 1, 'AndyMark', 3, 165, 'Ava'],
+  ]) {
+    const { item } = await call(lead, 'POST', '/items', { board_id: board.id, group_id: full.groups[g].id, title, assignee_id: ids[who], due_date: day(7 + g * 3) })
+    await call(lead, 'PUT', `/items/${item.id}/values/${col.Vendor.id}`, { value: vendor(v) })
+    await call(lead, 'PUT', `/items/${item.id}/values/${col.Qty.id}`, { value: qty })
+    await call(lead, 'PUT', `/items/${item.id}/values/${col['Total cost'].id}`, { value: cost })
+  }
+}
+
 for (const [name, url, username, secret, min_role, totp, notes] of [
   ['Onshape team account', 'https://cad.onshape.com', 'cad@example.org', 'demo-Onsh4pe!', 'lead', 'JBSWY3DPEHPK3PXP', ''],
   ['Shop Wi-Fi', '', 'Dragons302', 'demo-wifi-pass', 'member', null, 'SSID is Dragons302-5G in the shop.'],

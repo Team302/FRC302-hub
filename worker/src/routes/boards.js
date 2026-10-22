@@ -32,6 +32,19 @@ export const TEMPLATES = {
       ['checkbox', 'Packed'],
     ],
   },
+  purchasing: {
+    hidden: ['priority'],
+    groups: [['Requested', 'amber'], ['Approved', 'blue'], ['Ordered', 'violet'], ['Received', 'green']],
+    columns: [
+      ['dropdown', 'Vendor', { options: [opt('AndyMark', 'orange'), opt('REV', 'red'), opt('WCP', 'blue'), opt('McMaster-Carr', 'yellow'), opt('VEX', 'gray'), opt('CTRE', 'teal'), opt('Amazon', 'amber'), opt('Other', 'gray')] }],
+      ['link', 'Product link'],
+      ['number', 'Qty'],
+      ['number', 'Total cost', { unit: '$' }],
+      ['dropdown', 'Subsystem', { options: [opt('Drivetrain', 'orange'), opt('Intake', 'teal'), opt('Shooter', 'red'), opt('Climber', 'violet'), opt('Electrical', 'amber'), opt('Tools / shop', 'gray')] }],
+      ['date', 'Needed by'],
+      ['text', 'Tracking #'],
+    ],
+  },
   outreach: {
     groups: [['Planning', 'blue'], ['Confirmed', 'green'], ['Done', 'gray']],
     columns: [
@@ -121,7 +134,7 @@ export function boardRoutes(router, authed) {
     const color = v.oneOf(body.color ?? 'green', 'Color', COLORS)
     const template = TEMPLATES[v.oneOf(body.template ?? 'blank', 'Template', Object.keys(TEMPLATES))]
     const id = newId('brd')
-    const stmts = [env.DB.prepare('INSERT INTO boards (id, name, description, subteam_id, color, created_by) VALUES (?, ?, ?, ?, ?, ?)').bind(id, name, description, subteamId, color, user.id)]
+    const stmts = [env.DB.prepare('INSERT INTO boards (id, name, description, subteam_id, color, created_by, hidden_builtins) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(id, name, description, subteamId, color, user.id, JSON.stringify(template.hidden || []))]
     template.groups.forEach(([g, c], i) => stmts.push(env.DB.prepare('INSERT INTO board_groups (id, board_id, name, color, position) VALUES (?, ?, ?, ?, ?)').bind(newId('grp'), id, g, c, i)))
     template.columns.forEach(([type, title, settings], i) => stmts.push(env.DB.prepare('INSERT INTO board_columns (id, board_id, type, title, settings, position) VALUES (?, ?, ?, ?, ?, ?)')
       .bind(newId('col'), id, type, title, JSON.stringify(cleanSettings(type, settings)), i)))

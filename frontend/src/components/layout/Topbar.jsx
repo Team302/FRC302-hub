@@ -2,12 +2,13 @@
 // bell, theme, account menu and the round "+" New menu.
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, CheckSquare, LayoutGrid, LogOut, Menu, Monitor, Moon, Plus, Search, Sun, X } from 'lucide-react'
+import { Bell, CalendarDays, CalendarPlus, CheckSquare, LayoutGrid, LogOut, Menu, Monitor, Moon, Plus, Search, Sun, X } from 'lucide-react'
 import { get } from '../../lib/api'
 import { useSession } from '../../context/Session'
 import { atLeast } from '../../lib/constants'
 import { useTheme } from '../../lib/theme'
 import { StatusPill } from '../board/cells'
+import CalendarFeed from '../CalendarFeed'
 
 function Section({ label, children }) {
   return (
@@ -78,6 +79,7 @@ export default function Topbar({ onMenuClick }) {
   const [loading, setLoading] = useState(false)
   const [showUser, setShowUser] = useState(false)
   const [showNew, setShowNew] = useState(false)
+  const [calendarOpen, setCalendarOpen] = useState(false)
   const searchRef = useRef(null)
   const inputRef = useRef(null)
   const userRef = useRef(null)
@@ -165,6 +167,9 @@ export default function Topbar({ onMenuClick }) {
                 <p className="text-xs text-brand-gray-500 truncate">{user.email}</p>
               </div>
               <div className="p-1">
+                <button role="menuitem" onClick={() => { setShowUser(false); setCalendarOpen(true) }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-brand-gray-700 rounded-lg hover:bg-brand-gray-50 hover:text-brand-black transition-colors">
+                  <CalendarPlus className="w-3.5 h-3.5" /> Calendar feed
+                </button>
                 <button role="menuitem" onClick={signOut} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-status-danger rounded-lg hover:bg-red-50 transition-colors">
                   <LogOut className="w-3.5 h-3.5" /> Sign out
                 </button>
@@ -189,6 +194,7 @@ export default function Topbar({ onMenuClick }) {
           )}
         </div>
       </div>
+      {calendarOpen && <CalendarFeed onClose={() => setCalendarOpen(false)} />}
     </header>
   )
 }

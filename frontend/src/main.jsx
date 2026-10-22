@@ -17,10 +17,11 @@ import Team from './pages/Team'
 import Activity from './pages/Activity'
 import MyWork from './pages/MyWork'
 import Inbox from './pages/Inbox'
+import Attendance from './pages/Attendance'
 
-function AdminOnly({ children }) {
+function RoleOnly({ role, children }) {
   const { user } = useSession()
-  return atLeast(user, 'admin') ? children : <Navigate to="/" replace />
+  return atLeast(user, role) ? children : <Navigate to="/" replace />
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -39,7 +40,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <Route path="meetings/:id" element={<Meeting />} />
               <Route path="vault" element={<Vault />} />
               <Route path="team" element={<Team />} />
-              <Route path="activity" element={<AdminOnly><Activity /></AdminOnly>} />
+              <Route path="activity" element={<RoleOnly role="admin"><Activity /></RoleOnly>} />
+              <Route path="attendance" element={<RoleOnly role="lead"><Attendance /></RoleOnly>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

@@ -91,5 +91,6 @@ export const BOARD_TEMPLATES = [
   { id: 'blank', label: 'Blank', hint: 'This week, Next up, Backlog' },
   { id: 'build', label: 'Robot build', hint: 'Design → Fabrication → Assembly → Testing, with subsystem, timeline, hours, parts and CAD columns' },
   { id: 'competition', label: 'Competition prep', hint: 'Before, at and after an event, with area, helpers and a packing checkbox' },
+  { id: 'purchasing', label: 'Parts & purchasing', hint: 'Requested → Approved → Ordered → Received, with vendor, link, quantity, cost (totalled per group), needed-by date and tracking' },
   { id: 'outreach', label: 'Outreach', hint: 'Events with date, volunteers and volunteer hours' },
 ]

@@ -62,12 +62,13 @@ export function meetingRoutes(router, authed) {
     return json({ meetings: results })
   }))
 
+  // Creates one meeting, or a weekly series: `repeat_until` (YYYY-MM-DD) makes a copy every 7
+  // days through that date (up to 52). Every meeting in the series gets the same agenda.
   router.post('/api/meetings', authed(async (request, env, user) => {
     requireRole(user, 'lead')
     const body = await readBody(request)
     const kind = v.oneOf(body.kind ?? 'general', 'Type', KINDS)
     if (kind === 'mentor') requireRole(user, 'admin', 'Only mentors can create mentor meetings.')
-    const id = newId('mtg')
     const fields = {
       title: v.text(body.title, 'Title', { max: 120, required: true }),
       starts_at: v.dateTime(body.starts_at, 'Start', { required: true }),
@@ -76,23 +77,46 @@ export function meetingRoutes(router, authed) {
       facilitator_id: v.id(body.facilitator_id, 'Facilitator') ?? user.id,
       subteam_id: v.id(body.subteam_id, 'Subteam') ?? null,
     }
-    await env.DB.prepare(
-      `INSERT INTO meetings (id, title, kind, subteam_id, starts_at, duration_min, location, facilitator_id, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(id, fields.title, kind, fields.subteam_id, fields.starts_at, fields.duration_min, fields.location, fields.facilitator_id, user.id).run()
-
-    // Copy the agenda from an earlier meeting (weekly all-hands look the same every week).
-    const templateId = v.id(body.copy_agenda_from, 'Template')
-    if (templateId) {
-      const template = await getMeeting(env, user, templateId)
-      const items = await agendaOf(env, template.id)
-      if (items.length) {
-        await env.DB.batch(items.map((a) => env.DB.prepare(
-          'INSERT INTO agenda_items (id, meeting_id, title, owner_id, minutes, position) VALUES (?, ?, ?, ?, ?, ?)'
-        ).bind(newId('agi'), id, a.title, a.owner_id, a.minutes, a.position)))
+    const until = v.date(body.repeat_until, 'Repeat until')
+    const starts = [fields.starts_at]
+    if (until) {
+      if (until < fields.starts_at.slice(0, 10)) throw badRequest('“Repeat until” is before the first meeting.')
+      for (let t = Date.parse(fields.starts_at) + 7 * 86400000; new Date(t).toISOString().slice(0, 10) <= until; t += 7 * 86400000) {
+        starts.push(new Date(t).toISOString())
+        if (starts.length > 52) throw badRequest('A series can have up to 52 meetings. Pick an earlier end date.')
       }
     }
-    return json({ meeting: await getMeeting(env, user, id) }, { status: 201 })
+    const seriesId = starts.length > 1 ? newId('ser') : null
+
+    const templateId = v.id(body.copy_agenda_from, 'Template')
+    const agenda = templateId ? await agendaOf(env, (await getMeeting(env, user, templateId)).id) : []
+
+    const ids = starts.map(() => newId('mtg'))
+    const stmts = []
+    starts.forEach((start, i) => {
+      stmts.push(env.DB.prepare(
+        `INSERT INTO meetings (id, title, kind, subteam_id, starts_at, duration_min, location, facilitator_id, created_by, series_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(ids[i], fields.title, kind, fields.subteam_id, start, fields.duration_min, fields.location, fields.facilitator_id, user.id, seriesId))
+      for (const a of agenda) {
+        stmts.push(env.DB.prepare('INSERT INTO agenda_items (id, meeting_id, title, owner_id, minutes, position) VALUES (?, ?, ?, ?, ?, ?)')
+          .bind(newId('agi'), ids[i], a.title, a.owner_id, a.minutes, a.position))
+      }
+    })
+    await env.DB.batch(stmts)
+    if (seriesId) await logActivity(env, request, user, { action: 'meeting.series', entity: 'meeting', entityId: ids[0], summary: `Scheduled ${starts.length} weekly “${fields.title}” meetings` })
+    return json({ meeting: await getMeeting(env, user, ids[0]), created: ids.length }, { status: 201 })
+  }))
+
+  // Remove the rest of a series: this meeting and every later one that hasn't started.
+  router.delete('/api/meetings/:id/following', authed(async (request, env, user) => {
+    requireRole(user, 'lead')
+    const meeting = await getMeeting(env, user, request.params.id)
+    if (!meeting.series_id) throw badRequest('This meeting isn’t part of a series.')
+    const res = await env.DB.prepare("DELETE FROM meetings WHERE series_id = ? AND starts_at >= ? AND status = 'scheduled'")
+      .bind(meeting.series_id, meeting.starts_at).run()
+    await logActivity(env, request, user, { action: 'meeting.delete', entity: 'meeting', entityId: meeting.id, summary: `Deleted ${res.meta.changes} meetings from the “${meeting.title}” series` })
+    return json({ deleted: res.meta.changes })
   }))
 
   router.get('/api/meetings/:id', authed(async (request, env, user) => {
