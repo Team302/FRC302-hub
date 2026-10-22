@@ -46,3 +46,24 @@ export async function apiFetch(path, init = {}) {
   const headers = { ...(init.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }
   return fetch(path, { ...init, headers })
 }
+
+// Downloads an authenticated file (a plain link can't carry the bearer token). The name comes
+// from the server's Content-Disposition when it sends one.
+export async function downloadFile(path, fallbackName) {
+  const res = await apiFetch(path)
+  if (!res.ok) {
+    let message = `The server answered ${res.status}.`
+    try { message = (await res.json()).error || message } catch { /* not JSON */ }
+    throw new ApiError(res.status, message)
+  }
+  const cd = res.headers.get('Content-Disposition') || ''
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(cd)
+  const plain = /filename="([^"]+)"/i.exec(cd)
+  let name = fallbackName
+  try { name = star ? decodeURIComponent(star[1]) : plain ? plain[1] : fallbackName } catch { /* keep fallback */ }
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(await res.blob())
+  a.download = name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+}

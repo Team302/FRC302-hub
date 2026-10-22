@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
-import { ScrollText } from 'lucide-react'
-import { get } from '../lib/api'
+import { Download, ScrollText } from 'lucide-react'
+import { downloadFile, get } from '../lib/api'
+import { useToast } from '../context/ToastContext'
 import { fmtFull, parseServerTime } from '../lib/format'
 import EmptyState from '../components/ui/EmptyState'
 import FilterChips from '../components/ui/FilterChips'
 import PageHeader from '../components/ui/PageHeader'
 import { SkeletonTable } from '../components/ui/Skeleton'
 
-const FILTERS = [{ key: '', label: 'All' }, { key: 'vault', label: 'Vault' }, { key: 'user', label: 'People' }, { key: 'board', label: 'Boards' }, { key: 'item', label: 'Tasks' }, { key: 'meeting', label: 'Meetings' }]
+const FILTERS = [{ key: '', label: 'All' }, { key: 'vault', label: 'Vault' }, { key: 'user', label: 'People' }, { key: 'board', label: 'Boards' }, { key: 'item', label: 'Tasks' }, { key: 'meeting', label: 'Meetings' }, { key: 'team', label: 'Backups' }]
 
 export default function Activity() {
   const [entity, setEntity] = useState('')
   const [rows, setRows] = useState(null)
   const [more, setMore] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const { error } = useToast()
   useEffect(() => {
     setRows(null)
     get(`/activity${entity ? `?entity=${entity}` : ''}`).then((d) => { setRows(d.activity); setMore(d.activity.length === 100) })
@@ -24,7 +27,13 @@ export default function Activity() {
   }
   return (
     <div>
-      <PageHeader title="Audit log" subtitle="Password reveals, roster changes, deletions and automations. Visible to mentors only." />
+      <PageHeader title="Audit log" subtitle="Password reveals, roster changes, deletions and automations. Visible to mentors only."
+        actions={
+          <button type="button" className="btn-secondary" disabled={busy} title="Boards, tasks, meetings, attendance, events and this log as JSON. Vault passwords, 2FA keys and notes are not included."
+            onClick={async () => { setBusy(true); try { await downloadFile('/api/admin/backup', 'backup.json') } catch (e) { error('Couldn’t download the backup', e.message) } finally { setBusy(false) } }}>
+            <Download className="w-4 h-4" />{busy ? 'Preparing…' : 'Download backup'}
+          </button>
+        } />
       <FilterChips className="mb-4" aria-label="Show" value={entity} onChange={setEntity} options={FILTERS} />
       {!rows ? <div className="card"><SkeletonTable rows={8} cols={4} /></div> : rows.length === 0 ? (
         <div className="card"><EmptyState icon={ScrollText} title="Nothing recorded yet" /></div>

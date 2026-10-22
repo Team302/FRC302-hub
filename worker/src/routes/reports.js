@@ -11,6 +11,7 @@
 //   rate      attended / (expected − excused)
 // Leads and mentors see everyone; members see only themselves.
 import { atLeast, requireRole } from '../lib/auth.js'
+import { csvResponse } from '../lib/csv.js'
 import { badRequest, json } from '../lib/http.js'
 import * as v from '../lib/validate.js'
 
@@ -128,22 +129,14 @@ export function reportRoutes(router, authed) {
     return json({ ...report, me: report.people[0] || null })
   }))
 
-  // CSV for spreadsheets. Names are escaped against formula injection (a cell starting with
-  // = + - @ is prefixed with a quote), since this file is opened in Excel/Sheets.
+  // CSV for spreadsheets (lib/csv.js escapes against formula injection).
   router.get('/api/reports/attendance.csv', authed(async (request, env, user) => {
     requireRole(user, 'lead')
     const report = await attendanceReport(env, range(request))
     const { results: subteams } = await env.DB.prepare('SELECT id, name FROM subteams').all()
     const st = Object.fromEntries(subteams.map((s) => [s.id, s.name]))
-    const cell = (val) => {
-      let s = val === null || val === undefined ? '' : String(val)
-      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-    }
-    const lines = [['Name', 'Role', 'Subteam', 'Meetings expected', 'Attended', 'Late', 'Excused', 'Attendance %', 'Hours'].join(',')]
-    for (const r of report.people) lines.push([r.name, r.role, st[r.subteam_id] || '', r.expected, r.attended, r.late, r.excused, r.rate ?? '', r.hours].map(cell).join(','))
-    return new Response(`${lines.join('\r\n')}\r\n`, {
-      headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="attendance-${report.from}-to-${report.to}.csv"` },
-    })
+    const rows = [['Name', 'Role', 'Subteam', 'Meetings expected', 'Attended', 'Late', 'Excused', 'Attendance %', 'Hours']]
+    for (const r of report.people) rows.push([r.name, r.role, st[r.subteam_id] || '', r.expected, r.attended, r.late, r.excused, r.rate ?? '', r.hours])
+    return csvResponse(rows, `attendance-${report.from}-to-${report.to}.csv`)
   }))
 }

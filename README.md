@@ -37,6 +37,8 @@ Ordered → Received, with vendor, link, quantity, cost totals per group and tra
 - **Trash with Undo.** Deleting a task (or a bulk selection) shows an Undo; deleted tasks wait in the board's Trash for
   30 days with their subitems, values, updates and files, then the hourly job removes them for good. A lead, the task's
   creator, or whoever deleted it can restore it. Deleting a group or a board is still immediate.
+- **Export to CSV** (the download button on any board): every task and subitem with every visible column, for parts
+  lists, sponsor and grant reports. Opens in Excel or Google Sheets; cells that look like formulas are defused.
 
 **Inbox.** Notifications when you're assigned, added to a people column, @mentioned, when someone updates or changes the
 status of a task you own, automation alerts, and due-date reminders (hourly job, once per task per day). The unread count
@@ -79,6 +81,11 @@ everyone, leads and mentors, or mentors only. Passwords are revealed one at a ti
 from the clipboard after 30. **Every reveal is logged with name, time and IP.** An entry can hold a 2FA key: the server
 hands out the 6-digit code, never the key. A generator makes strong passwords, and new passwords are checked against
 known data breaches (Have I Been Pwned, k-anonymity: only 5 characters of the password's hash leave the browser).
+
+**Backup** (mentors). Audit log → Download backup: boards, tasks, values, updates, history, meetings, attendance, events,
+the roster and the audit log as one JSON file. Vault passwords, 2FA keys and notes are **not** in it, nor are push
+subscriptions or calendar links; file attachments are listed but not included. Every download is in the audit log.
+There is no restore-from-backup button yet; it's a copy for safekeeping and for moving data elsewhere.
 
 **Setup checklist.** Mentors get a short checklist on Home (add people, first board, meetings, events, vault,
 notifications) that ticks itself off.

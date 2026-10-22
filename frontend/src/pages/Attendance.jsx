@@ -1,7 +1,7 @@
 // Attendance and hours per person, for lettering, travel eligibility and grant reports.
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Clock, Download, Percent, UserCheck, Users } from 'lucide-react'
-import { apiFetch, get } from '../lib/api'
+import { downloadFile, get } from '../lib/api'
 import { useSession } from '../context/Session'
 import { useToast } from '../context/ToastContext'
 import { ROLE, SWATCH } from '../lib/constants'
@@ -60,15 +60,7 @@ export default function Attendance() {
   const below = rated.filter((r) => r.rate < 75).length
 
   const download = async () => {
-    try {
-      const res = await apiFetch(`/api/reports/attendance.csv?from=${from}&to=${to}`)
-      if (!res.ok) throw new Error(`Download failed (${res.status}).`)
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(await res.blob())
-      a.download = `attendance-${from}-to-${to}.csv`
-      a.click()
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000)
-    } catch (e) { error('Couldn’t download', e.message) }
+    try { await downloadFile(`/api/reports/attendance.csv?from=${from}&to=${to}`, `attendance-${from}-to-${to}.csv`) } catch (e) { error('Couldn’t download', e.message) }
   }
   const header = (c) => (
     <th key={c.key} className={c.num ? 'text-right' : ''}>

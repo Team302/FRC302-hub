@@ -2,7 +2,7 @@
 // Files are fetched with the session token (they aren't public), then shown from a blob URL.
 import { useEffect, useRef, useState } from 'react'
 import { Download, FileText, ImageIcon, Paperclip, Trash2, UploadCloud } from 'lucide-react'
-import { apiFetch, del, get } from '../../lib/api'
+import { apiFetch, del, downloadFile, get } from '../../lib/api'
 import { useSession } from '../../context/Session'
 import { useToast } from '../../context/ToastContext'
 import { atLeast } from '../../lib/constants'
@@ -55,13 +55,7 @@ export default function Files({ itemId, onChanged }) {
     }
   }
   async function download(f) {
-    const res = await apiFetch(`/api/attachments/${f.id}`)
-    if (!res.ok) { error('Couldn’t download', `The server answered ${res.status}.`); return }
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(await res.blob())
-    a.download = f.filename
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+    try { await downloadFile(`/api/attachments/${f.id}`, f.filename) } catch (e) { error('Couldn’t download', e.message) }
   }
   async function remove(f) {
     try { await del(`/attachments/${f.id}`); setFiles((cur) => cur.filter((x) => x.id !== f.id)); success('File deleted'); onChanged?.() } catch (e) { error('Couldn’t delete', e.message) }

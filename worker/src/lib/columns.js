@@ -104,3 +104,19 @@ export function describeValue(column, value, userNames = {}) {
     default: return String(value).slice(0, 120)
   }
 }
+
+// A value as a spreadsheet cell: numbers stay numbers, dates stay ISO, nothing is truncated.
+export function exportValue(column, value, userNames = {}) {
+  if (value === null || value === undefined) return ''
+  const settings = typeof column.settings === 'string' ? JSON.parse(column.settings) : column.settings
+  switch (column.type) {
+    case 'status': return settings.labels.find((l) => l.id === value)?.label || ''
+    case 'dropdown': return value.map((id) => settings.options.find((o) => o.id === id)?.label).filter(Boolean).join(', ')
+    case 'people': return value.map((id) => userNames[id] || 'former member').join(', ')
+    case 'timeline': return `${value.start} – ${value.end}`
+    case 'checkbox': return value ? 'Yes' : ''
+    case 'link': return value.url
+    case 'number': return Number(value)
+    default: return String(value)
+  }
+}

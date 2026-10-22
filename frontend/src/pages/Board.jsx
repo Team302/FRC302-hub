@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { BarChart3, CalendarDays, Columns3, GanttChartSquare, LayoutGrid, Plus, Search, Settings2, Star, Table2, Trash2, Zap } from 'lucide-react'
-import { del } from '../lib/api'
+import { BarChart3, CalendarDays, Columns3, Download, GanttChartSquare, LayoutGrid, Plus, Search, Settings2, Star, Table2, Trash2, Zap } from 'lucide-react'
+import { del, downloadFile } from '../lib/api'
 import { useSession } from '../context/Session'
 import { useToast } from '../context/ToastContext'
 import { atLeast, boardStatuses, SWATCH } from '../lib/constants'
@@ -32,7 +32,7 @@ function writePref(key, value) { try { localStorage.setItem(key, JSON.stringify(
 export default function Board() {
   const { id } = useParams()
   const { user, users, boards, refreshBoards } = useSession()
-  const { success } = useToast()
+  const { success, error: toastError } = useToast()
   const [confirm, confirmDialog] = useConfirm()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -172,6 +172,8 @@ export default function Board() {
           <button type="button" className="btn-secondary btn-sm" onClick={() => setAutomationsOpen(true)}>
             <Zap className="w-4 h-4" />Automate{data.automation_count ? <span className="badge-success ml-0.5">{data.automation_count}</span> : null}
           </button>
+          <button type="button" className="btn-secondary btn-sm" aria-label="Export to CSV" title="Export to CSV (Excel, Google Sheets)"
+            onClick={() => downloadFile(`/api/boards/${id}/export.csv`, `${data.board.name}.csv`).catch((e) => toastError('Couldn’t export', e.message))}><Download className="w-4 h-4" /></button>
           <button type="button" className="btn-secondary btn-sm" onClick={() => setTrashOpen(true)} aria-label="Trash" title="Deleted tasks"><Trash2 className="w-4 h-4" /></button>
           {canManage && <button type="button" className="btn-secondary btn-sm" onClick={() => setSettingsOpen(true)}><Settings2 className="w-4 h-4" />Settings</button>}
         </div>

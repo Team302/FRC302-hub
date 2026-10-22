@@ -9,6 +9,7 @@ import { sendDueReminders } from './lib/reminders.js'
 import { purgeTrash } from './lib/trash.js'
 import { attachmentRoutes } from './routes/attachments.js'
 import { authRoutes } from './routes/auth.js'
+import { backupRoutes } from './routes/backup.js'
 import { boardRoutes } from './routes/boards.js'
 import { calendarRoutes } from './routes/calendar.js'
 import { eventRoutes } from './routes/events.js'
@@ -44,6 +45,7 @@ export function buildRouter() {
   pushRoutes(router, authed)
   attachmentRoutes(router, authed)
   eventRoutes(router, authed)
+  backupRoutes(router, authed)
   router.get('/api/health', () => Response.json({ ok: true }))
   router.all('/api/*', () => { throw new HttpError(404, 'No such API route.', 'not_found') })
   return router

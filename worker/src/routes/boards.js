@@ -3,8 +3,9 @@
 import { requireRole } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 import { badRequest, conflict, json, newId, notFound, readBody } from '../lib/http.js'
-import { cleanSettings, COLUMN_TYPES, DEFAULT_SETTINGS } from '../lib/columns.js'
-import { STATUSES } from '../lib/items.js'
+import { cleanSettings, COLUMN_TYPES, DEFAULT_SETTINGS, exportValue } from '../lib/columns.js'
+import { csvResponse } from '../lib/csv.js'
+import { STATUSES, statusLabel } from '../lib/items.js'
 import { TRASH_DAYS } from '../lib/trash.js'
 import { deleteFilesForBoard, deleteFilesForItems } from './attachments.js'
 import * as v from '../lib/validate.js'
@@ -195,6 +196,40 @@ export function boardRoutes(router, authed) {
     await env.DB.prepare('DELETE FROM boards WHERE id = ?').bind(board.id).run()
     await logActivity(env, request, user, { action: 'board.delete', entity: 'board', entityId: board.id, summary: `Deleted board ${board.name}` })
     return json({ ok: true })
+  }))
+
+  // The whole board as a spreadsheet: one row per task, its subitems right after it, every
+  // visible column. For sponsors' parts lists, grant reports and end-of-season archives.
+  router.get('/api/boards/:id/export.csv', authed(async (request, env) => {
+    const board = await getBoard(env, request.params.id)
+    const hidden = new Set(JSON.parse(board.hidden_builtins || '[]'))
+    const [{ results: groups }, { results: items }, { results: columns }, { results: values }, { results: people }] = await Promise.all([
+      env.DB.prepare('SELECT id, name FROM board_groups WHERE board_id = ? ORDER BY position').bind(board.id).all(),
+      env.DB.prepare(`SELECT i.*, u.name AS assignee_name, (SELECT COUNT(*) FROM item_updates iu WHERE iu.item_id = i.id) AS update_count
+                        FROM live_items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.board_id = ? ORDER BY i.position, i.created_at`).bind(board.id).all(),
+      env.DB.prepare('SELECT * FROM board_columns WHERE board_id = ? ORDER BY position, created_at').bind(board.id).all(),
+      env.DB.prepare('SELECT v.item_id, v.column_id, v.value FROM item_values v JOIN live_items i ON i.id = v.item_id WHERE i.board_id = ?').bind(board.id).all(),
+      env.DB.prepare('SELECT id, name FROM users').all(),
+    ])
+    const names = Object.fromEntries(people.map((u) => [u.id, u.name]))
+    const valueMap = {}
+    for (const row of values) (valueMap[row.item_id] ||= {})[row.column_id] = JSON.parse(row.value)
+    const builtins = [
+      ['owner', 'Owner', (i) => i.assignee_name || ''],
+      ['status', 'Status', (i) => statusLabel(board, i.status)],
+      ['priority', 'Priority', (i) => i.priority],
+      ['due', 'Due date', (i) => i.due_date || ''],
+    ].filter(([key]) => !hidden.has(key))
+    const rows = [['Group', 'Task', 'Subitem of', ...builtins.map(([, title]) => title), ...columns.map((c) => c.title), 'Updates', 'Created', 'Completed']]
+    const row = (i, group, parent) => [group, i.title, parent || '', ...builtins.map(([, , get]) => get(i)),
+      ...columns.map((c) => exportValue(c, valueMap[i.id]?.[c.id], names)), i.update_count, i.created_at.slice(0, 10), i.completed_at?.slice(0, 10) || '']
+    for (const g of groups) {
+      for (const i of items.filter((x) => x.group_id === g.id && !x.parent_id)) {
+        rows.push(row(i, g.name))
+        for (const sub of items.filter((x) => x.parent_id === i.id)) rows.push(row(sub, g.name, i.title))
+      }
+    }
+    return csvResponse(rows, `${board.name} ${new Date().toISOString().slice(0, 10)}.csv`)
   }))
 
   // Trashed tasks on a board, newest first. A subitem that went with its parent is listed under
