@@ -23,7 +23,7 @@ export function homeRoutes(router, authed) {
                 SUM(CASE WHEN i.status = 'done' THEN 1 ELSE 0 END) AS done,
                 SUM(CASE WHEN i.status = 'stuck' THEN 1 ELSE 0 END) AS stuck,
                 SUM(CASE WHEN i.status = 'working' THEN 1 ELSE 0 END) AS working
-           FROM boards b LEFT JOIN items i ON i.board_id = b.id
+           FROM boards b LEFT JOIN items i ON i.board_id = b.id AND i.parent_id IS NULL
           WHERE b.is_archived = 0 GROUP BY b.id ORDER BY b.created_at`
       ).all(),
       env.DB.prepare(

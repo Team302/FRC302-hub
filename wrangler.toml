@@ -11,6 +11,10 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
+# Hourly: due-date reminders (worker/src/lib/reminders.js), once per task per day.
+[triggers]
+crons = ["0 * * * *"]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "frc302-hub-db"

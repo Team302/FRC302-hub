@@ -8,7 +8,7 @@ import { atLeast, requireRole } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 import { badRequest, conflict, forbidden, json, newId, notFound, readBody } from '../lib/http.js'
 import * as v from '../lib/validate.js'
-import { insertItem } from './boards.js'
+import { createItem } from '../lib/items.js'
 
 const KINDS = ['general', 'subteam', 'leadership', 'build', 'mentor']
 const ATTENDANCE = ['present', 'late', 'excused', 'absent']
@@ -281,7 +281,7 @@ export function meetingRoutes(router, authed) {
     const meeting = await getMeeting(env, user, request.params.id)
     requireRun(user, meeting)
     const body = await readBody(request)
-    const item = await insertItem(env, user, {
+    const item = await createItem(env, user, {
       board_id: v.id(body.board_id, 'Board', { nullable: false }),
       group_id: v.id(body.group_id, 'Group', { nullable: false }),
       title: v.text(body.title, 'Action', { max: 200, required: true }),

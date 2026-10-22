@@ -5,9 +5,11 @@
 import { Router } from 'itty-router'
 import { authenticate } from './lib/auth.js'
 import { HttpError } from './lib/http.js'
+import { sendDueReminders } from './lib/reminders.js'
 import { authRoutes } from './routes/auth.js'
 import { boardRoutes } from './routes/boards.js'
 import { homeRoutes } from './routes/home.js'
+import { itemRoutes } from './routes/items.js'
 import { meetingRoutes } from './routes/meetings.js'
 import { teamRoutes } from './routes/team.js'
 import { vaultRoutes } from './routes/vault.js'
@@ -27,6 +29,7 @@ export function buildRouter() {
   authRoutes(router)
   teamRoutes(router, authed)
   boardRoutes(router, authed)
+  itemRoutes(router, authed)
   meetingRoutes(router, authed)
   vaultRoutes(router, authed)
   homeRoutes(router, authed)
@@ -59,4 +62,8 @@ export async function handle(request, env, ctx) {
   }
 }
 
-export default { fetch: handle }
+export default {
+  fetch: handle,
+  // Hourly (wrangler.toml [triggers]); due-date reminders go out once per task per day.
+  scheduled: (_controller, env, ctx) => ctx.waitUntil(sendDueReminders(env)),
+}
