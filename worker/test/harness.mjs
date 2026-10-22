@@ -40,6 +40,17 @@ class D1 {
 
 export const vaultKey = () => randomBytes(32).toString('base64')
 
+// In-memory stand-in for an R2 bucket binding (the calls the worker makes).
+export class FakeR2 {
+  constructor() { this.objects = new Map() }
+  async put(key, body, { httpMetadata } = {}) { this.objects.set(key, { bytes: new Uint8Array(body), httpMetadata }) }
+  async get(key) {
+    const o = this.objects.get(key)
+    return o ? { body: new Blob([o.bytes]).stream(), httpMetadata: o.httpMetadata } : null
+  }
+  async delete(keys) { for (const k of [].concat(keys)) this.objects.delete(k) }
+}
+
 export async function makeApp(envOverrides = {}) {
   const env = {
     DB: new D1(),
@@ -47,6 +58,7 @@ export async function makeApp(envOverrides = {}) {
     DEV_LOGIN: 'on',
     JWT_SECRET: 'x'.repeat(40),
     VAULT_KEY: vaultKey(),
+    FILES: new FakeR2(),
     ...envOverrides,
   }
   const users = {}
@@ -67,7 +79,17 @@ export async function makeApp(envOverrides = {}) {
     try { data = JSON.parse(text) } catch { data = text }
     return { status: res.status, data, headers: res.headers }
   }
-  return { env, users, addUser, call, sql: (q, ...p) => env.DB.db.prepare(q).all(...p) }
+  // A raw-body request (file uploads).
+  async function upload(who, path, bytes, { type, filename }) {
+    const headers = { Authorization: `Bearer ${users[who].token}`, 'Content-Type': type, 'X-Filename': encodeURIComponent(filename) }
+    const res = await handle(new Request(`http://localhost${path}`, { method: 'POST', headers, body: bytes }), env, {})
+    return { status: res.status, data: await res.json() }
+  }
+  async function download(who, path) {
+    const res = await handle(new Request(`http://localhost${path}`, { headers: { Authorization: `Bearer ${users[who].token}` } }), env, {})
+    return { status: res.status, headers: res.headers, bytes: new Uint8Array(await res.arrayBuffer()) }
+  }
+  return { env, users, addUser, call, upload, download, sql: (q, ...p) => env.DB.db.prepare(q).all(...p) }
 }
 
 // A standard team: one mentor, one lead, two members.

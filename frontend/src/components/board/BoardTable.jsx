@@ -2,7 +2,7 @@
 // and a summary footer), Monday-style. The checkbox and task columns stay pinned while the rest
 // scroll sideways. Rows drag to reorder or move between groups; subitems expand under their task.
 import { useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, GripVertical, Maximize2, MessageSquare, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, GripVertical, Maximize2, MessageSquare, MoreHorizontal, Paperclip, Pencil, Plus, Trash2 } from 'lucide-react'
 import Popover from './Popover'
 import { ColumnCell, DateCell, PeopleCell, PriorityCell, StatusCell } from './cells'
 import { AddColumnButton, ColumnHeader, SummaryCell } from './columns'
@@ -76,6 +76,7 @@ function Row({ item, cols, ctx, titleW, depth, subCount, expanded, onToggleExpan
           <TitleEditor value={item.title} onSave={(title) => actions.updateItem(item.id, { title })}
             className={`flex-1 text-sm ${item.status === 'done' ? 'text-brand-gray-400' : 'text-brand-black'}`} />
           {subCount > 0 && <span className="text-[11px] text-brand-gray-500 bg-brand-gray-100 rounded px-1.5 shrink-0" title={`${subCount} subitems`}>{subCount}</span>}
+          {item.file_count > 0 && <span className="text-[11px] text-brand-gray-500 flex items-center gap-0.5 shrink-0" title={`${item.file_count} files`}><Paperclip className="w-3 h-3" />{item.file_count}</span>}
           <button type="button" onClick={() => openItem(item.id)} aria-label={`Open ${item.title}${item.update_count ? ` (${item.update_count} updates)` : ''}`}
             className={`shrink-0 h-7 px-1.5 rounded flex items-center gap-1 text-xs ${item.update_count ? 'text-accent-600' : 'text-brand-gray-300 opacity-0 group-hover/row:opacity-100 focus:opacity-100'} hover:bg-brand-gray-100 hover:text-brand-black`}>
             {item.update_count ? <><MessageSquare className="w-4 h-4" />{item.update_count}</> : <Maximize2 className="w-3.5 h-3.5" />}

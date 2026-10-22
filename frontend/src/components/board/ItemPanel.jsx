@@ -14,6 +14,7 @@ import SegmentedControl from '../ui/SegmentedControl'
 import { useConfirm } from '../list/useConfirm'
 import { ColumnCell, DateCell, PeopleCell, PriorityCell, StatusCell, StatusPill } from './cells'
 import { TYPE_ICON } from './columns'
+import Files from './Files'
 
 // Text box with "@name" autocomplete. Tracks which people were picked, so the server can notify them.
 function MentionBox({ users, value, onChange, onMention, onSubmit }) {
@@ -176,6 +177,7 @@ export default function ItemPanel({ itemId, board, data, statuses, actions, onCl
             <SegmentedControl aria-label="Task sections" size="md" value={tab} onChange={setTab} options={[
               { value: 'updates', label: `Updates${detail?.updates.length ? ` · ${detail.updates.length}` : ''}` },
               ...(!item.parent_id ? [{ value: 'subitems', label: `Subitems${subitems.length ? ` · ${subitems.length}` : ''}` }] : []),
+              { value: 'files', label: `Files${item.file_count ? ` · ${item.file_count}` : ''}` },
               { value: 'history', label: 'History' },
             ]} />
           </div>
@@ -220,6 +222,8 @@ export default function ItemPanel({ itemId, board, data, statuses, actions, onCl
                 </form>
               </div>
             )}
+
+            {tab === 'files' && <Files itemId={item.id} onChanged={actions.reload} />}
 
             {tab === 'history' && (
               !detail ? <div className="skeleton h-16 rounded-xl" /> : (

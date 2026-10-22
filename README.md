@@ -29,7 +29,8 @@ Ordered → Received, with vendor, link, quantity, cost totals per group and tra
 - **Search, person filter, filters** (status, priority, overdue, due this week, no date) and **sort** by any column.
 - **Views:** Main table, Kanban (lanes by status or any status column), Calendar (drag to reschedule), Timeline/Gantt,
   and Chart (status mix, open tasks per person and per group).
-- **Task panel:** every field, an updates thread with **@mentions**, subitems, and a full **history** of who changed what.
+- **Task panel:** every field, an updates thread with **@mentions**, subitems, **files** (part photos, PDFs, CAD
+  exports; drag and drop, up to 15 MB each, stored in Cloudflare R2), and a full **history** of who changed what.
 - **Automations:** "when status changes to Done, move it to Testing", "when Stuck, notify a mentor", "when a task is
   created, assign it to …". Loops are capped.
 - **Favorites** pin boards to the top of the sidebar.
@@ -159,7 +160,8 @@ build time on your machine and none of it ships to the browser. The fix is a Tai
 
 ## Deploying to Cloudflare
 
-1. `npx wrangler d1 create frc302-hub-db` and paste the id into `wrangler.toml`.
+1. `npx wrangler d1 create frc302-hub-db` and paste the id into `wrangler.toml`. Then
+   `npx wrangler r2 bucket create frc302-hub-files` for task attachments.
 2. Set `APP_URL` in `wrangler.toml` to the URL the team will use, e.g. `https://hub.team302.org`.
 3. **Clerk:** create an application.
    - Restrictions → Sign-up mode → **Restricted**. Nobody signs themselves up.

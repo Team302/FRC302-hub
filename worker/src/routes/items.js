@@ -6,6 +6,7 @@ import { logActivity } from '../lib/activity.js'
 import { badRequest, forbidden, json, newId, notFound, readBody } from '../lib/http.js'
 import { createItem, getItem, ITEM_COLUMNS, PRIORITIES, setValue, STATUSES, updateItem } from '../lib/items.js'
 import { notify, resolveMentions } from '../lib/notify.js'
+import { deleteFilesForItems } from './attachments.js'
 import * as v from '../lib/validate.js'
 
 const MAX_BULK = 200
@@ -32,6 +33,7 @@ async function getColumn(env, id) {
 
 async function deleteItem(env, request, user, item) {
   if (!canDelete(user, item)) throw forbidden('Only a lead, or the person who created it, can delete a task.')
+  await deleteFilesForItems(env, [item.id])
   await env.DB.prepare('DELETE FROM items WHERE id = ?').bind(item.id).run()
   await logActivity(env, request, user, { action: 'item.delete', entity: 'item', entityId: item.id, summary: `Deleted task “${item.title}”` })
 }

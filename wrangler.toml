@@ -22,6 +22,11 @@ database_name = "frc302-hub-db"
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
+# Task attachments. Create once: npx wrangler r2 bucket create frc302-hub-files
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "frc302-hub-files"
+
 [vars]
 ENVIRONMENT = "production"
 TEAM_NAME = "FRC Team 302"

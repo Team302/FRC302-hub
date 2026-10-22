@@ -6,6 +6,7 @@ import { Router } from 'itty-router'
 import { authenticate } from './lib/auth.js'
 import { HttpError } from './lib/http.js'
 import { sendDueReminders } from './lib/reminders.js'
+import { attachmentRoutes } from './routes/attachments.js'
 import { authRoutes } from './routes/auth.js'
 import { boardRoutes } from './routes/boards.js'
 import { calendarRoutes } from './routes/calendar.js'
@@ -39,6 +40,7 @@ export function buildRouter() {
   calendarRoutes(router, authed)
   reportRoutes(router, authed)
   pushRoutes(router, authed)
+  attachmentRoutes(router, authed)
   router.get('/api/health', () => Response.json({ ok: true }))
   router.all('/api/*', () => { throw new HttpError(404, 'No such API route.', 'not_found') })
   return router

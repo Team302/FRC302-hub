@@ -5,6 +5,7 @@ import { logActivity } from '../lib/activity.js'
 import { badRequest, conflict, json, newId, notFound, readBody } from '../lib/http.js'
 import { cleanSettings, COLUMN_TYPES, DEFAULT_SETTINGS } from '../lib/columns.js'
 import { STATUSES } from '../lib/items.js'
+import { deleteFilesForBoard } from './attachments.js'
 import * as v from '../lib/validate.js'
 import { COLORS } from './team.js'
 
@@ -149,7 +150,8 @@ export function boardRoutes(router, authed) {
       env.DB.prepare('SELECT * FROM board_groups WHERE board_id = ? ORDER BY position').bind(board.id).all(),
       env.DB.prepare(`SELECT i.id, i.board_id, i.group_id, i.parent_id, i.title, i.status, i.priority, i.assignee_id, i.due_date, i.position,
                              i.created_by, i.created_at, i.updated_at, i.completed_at, u.name AS assignee_name,
-                             (SELECT COUNT(*) FROM item_updates iu WHERE iu.item_id = i.id) AS update_count
+                             (SELECT COUNT(*) FROM item_updates iu WHERE iu.item_id = i.id) AS update_count,
+                             (SELECT COUNT(*) FROM attachments a WHERE a.item_id = i.id) AS file_count
                         FROM items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.board_id = ? ORDER BY i.position, i.created_at`).bind(board.id).all(),
       env.DB.prepare('SELECT * FROM board_columns WHERE board_id = ? ORDER BY position, created_at').bind(board.id).all(),
       env.DB.prepare('SELECT v.item_id, v.column_id, v.value FROM item_values v JOIN items i ON i.id = v.item_id WHERE i.board_id = ?').bind(board.id).all(),
@@ -188,6 +190,7 @@ export function boardRoutes(router, authed) {
   router.delete('/api/boards/:id', authed(async (request, env, user) => {
     requireRole(user, 'admin', 'Only mentors can delete a board. Leads can archive it instead.')
     const board = await getBoard(env, request.params.id)
+    await deleteFilesForBoard(env, board.id)
     await env.DB.prepare('DELETE FROM boards WHERE id = ?').bind(board.id).run()
     await logActivity(env, request, user, { action: 'board.delete', entity: 'board', entityId: board.id, summary: `Deleted board ${board.name}` })
     return json({ ok: true })
