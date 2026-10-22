@@ -29,8 +29,10 @@ const trimmed = (v) => (typeof v === 'string' ? v.trim() : '')
 
 export const clerkConfigured = (env) => trimmed(env?.CLERK_JWT_KEY) !== ''
 
+// The .dev.vars.example placeholder is public, so a JWT_SECRET still starting with it signs nothing.
 export function devLoginEnabled(env) {
-  return env?.ENVIRONMENT === 'development' && env?.DEV_LOGIN === 'on' && !clerkConfigured(env) && trimmed(env?.JWT_SECRET).length >= 32
+  const secret = trimmed(env?.JWT_SECRET)
+  return env?.ENVIRONMENT === 'development' && env?.DEV_LOGIN === 'on' && !clerkConfigured(env) && secret.length >= 32 && !secret.startsWith('change-me')
 }
 
 // ── Clerk ──

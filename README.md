@@ -104,14 +104,20 @@ Requires Node 22.13+.
 
 ```bash
 npm install && npm install --prefix frontend
-cp .dev.vars.example .dev.vars
-# fill in JWT_SECRET (32+ random chars) and VAULT_KEY:
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 npm run db:migrate:local
 npm run dev                         # worker on :8787, app on http://localhost:5173
-node scripts/seed-demo.mjs          # optional: a fake demo team, boards, meetings and vault entries
-npm test                            # 25 integration tests, real SQLite, no mocks of app code
+node scripts/seed-demo.mjs          # optional, in a second terminal: fake team, boards, meetings, vault
+npm test                            # integration tests, real SQLite, no mocks of app code
 ```
+
+`npm run dev` first runs `scripts/setup-dev.mjs`. That creates `.dev.vars` with random secrets (a placeholder
+`JWT_SECRET` or empty `VAULT_KEY` copied from the example gets filled in), and creates `frontend/dist`, which
+`wrangler dev` needs before its first build. The first mentor is `mentor@example.org`; to use another address, set
+`BOOTSTRAP_ADMIN_EMAIL` in `.dev.vars` before seeding.
+
+`npm audit` in `frontend/` reports Tailwind 3's build tooling (braces, micromatch, chokidar). It runs only at
+build time on your machine and none of it ships to the browser. The fix is a Tailwind 4 migration. Don't run
+`npm audit fix --force`: it applies that migration blindly and breaks the styles.
 
 ## Deploying to Cloudflare
 

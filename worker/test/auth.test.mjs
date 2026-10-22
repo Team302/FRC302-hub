@@ -19,7 +19,7 @@ test('role changes apply on the next request, not at token expiry', async () => 
 })
 
 test('dev login is refused in production, off-localhost, or without DEV_LOGIN', async () => {
-  for (const env of [{ ENVIRONMENT: 'production' }, { DEV_LOGIN: undefined }]) {
+  for (const env of [{ ENVIRONMENT: 'production' }, { DEV_LOGIN: undefined }, { JWT_SECRET: 'change-me-to-at-least-32-random-characters' }]) {
     const app = await makeTeam(env)
     assert.equal((await app.call(null, 'POST', '/api/auth/dev-login', { email: 'mentor@example.org' })).status, 404)
     // and existing dev tokens stop working too

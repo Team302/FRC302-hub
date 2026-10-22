@@ -3,14 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
+    "predev": "node scripts/setup-dev.mjs",
     "dev": "concurrently --names worker,app --prefix-colors cyan,magenta \"wrangler dev --port 8787\" \"npm run dev --prefix frontend\"",
     "build": "npm run build --prefix frontend",
     "test": "node --test --disable-warning=ExperimentalWarning \"worker/test/*.test.mjs\"",
     "db:migrate:local": "wrangler d1 migrations apply frc302-hub-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply frc302-hub-db --remote",
-    "deploy": "npm test && npm run build && wrangler d1 migrations apply frc302-hub-db --remote && wrangler deploy"
+    "deploy": "npm test && npm run build && wrangler d1 migrations apply frc302-hub-db --remote && wrangler deploy",
+    "setup": "node scripts/setup-dev.mjs"
   },
   "dependencies": {
     "itty-router": "^5.0.18",
