@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertOctagon, CalendarDays, CheckCircle2, Clock, LayoutGrid, ListChecks, Radio } from 'lucide-react'
+import { AlertOctagon, CalendarDays, CheckCircle2, Clock, LayoutGrid, ListChecks, Radio, Trophy } from 'lucide-react'
 import { get } from '../lib/api'
 import { useSession } from '../context/Session'
-import { MEETING_KIND, STATUS, SWATCH } from '../lib/constants'
+import { atLeast, MEETING_KIND, STATUS, SWATCH } from '../lib/constants'
 import { dueInfo, fmtTime, parseServerTime, relative, todayIso } from '../lib/format'
 import PageHeader from '../components/ui/PageHeader'
 import StatCard from '../components/ui/StatCard'
@@ -12,6 +12,8 @@ import SegmentedBar from '../components/ui/SegmentedBar'
 import { Stagger } from '../components/ui/Motion'
 import { SkeletonTable } from '../components/ui/Skeleton'
 import { StatusPill } from '../components/board/cells'
+import { countdown, daysUntil, EVENT_KIND } from './Season'
+import SetupChecklist from '../components/SetupChecklist'
 
 export function DueText({ due, done }) {
   const info = dueInfo(due, done)
@@ -24,7 +26,12 @@ export default function Home() {
   const { user, openNew } = useSession()
   const [data, setData] = useState(null)
   const [hours, setHours] = useState(null)
-  useEffect(() => { get('/home').then(setData); get('/me/attendance').then((d) => setHours(d.me)).catch(() => {}) }, [])
+  const [nextEvent, setNextEvent] = useState(null)
+  useEffect(() => {
+    get('/home').then(setData)
+    get('/me/attendance').then((d) => setHours(d.me)).catch(() => {})
+    get('/events').then((d) => setNextEvent(d.events.find((e) => daysUntil(e.ends_on) >= 0) || null)).catch(() => {})
+  }, [])
 
   const today = todayIso()
   const weekEnd = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
@@ -42,6 +49,18 @@ export default function Home() {
           <span className="relative flex h-2.5 w-2.5"><span className="absolute inset-0 rounded-full bg-accent-500 opacity-60 motion-safe:animate-ping" /><span className="relative h-2.5 w-2.5 rounded-full bg-accent-500" /></span>
           <span className="flex-1 text-sm"><span className="font-medium">{live.title}</span> <span className="text-brand-gray-500">is in progress.</span></span>
           <span className="btn-secondary btn-sm"><Radio className="w-4 h-4" />Join</span>
+        </Link>
+      )}
+
+      {data && atLeast(user, 'admin') && <SetupChecklist upcomingMeetings={data.meetings.length} />}
+
+      {nextEvent && (
+        <Link to="/season" className="card flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3.5 mb-6 relative overflow-hidden">
+          <span className="absolute inset-y-0 left-0 w-1 bg-flame-500" aria-hidden="true" />
+          <Trophy className="w-4 h-4 text-flame-500" />
+          <span className="text-sm"><span className="font-medium">{nextEvent.name}</span> <span className="text-brand-gray-500">{countdown(nextEvent)}</span></span>
+          <span className={`${EVENT_KIND[nextEvent.kind].cls} ml-auto`}>{EVENT_KIND[nextEvent.kind].label}</span>
+          {daysUntil(nextEvent.starts_on) > 0 && <span className="text-2xl font-semibold tabular-nums">{daysUntil(nextEvent.starts_on)}<span className="text-xs font-normal text-brand-gray-500 ml-1">days</span></span>}
         </Link>
       )}
 

@@ -18,6 +18,8 @@ import Activity from './pages/Activity'
 import MyWork from './pages/MyWork'
 import Inbox from './pages/Inbox'
 import Attendance from './pages/Attendance'
+import Season from './pages/Season'
+import Workload from './pages/Workload'
 
 function RoleOnly({ role, children }) {
   const { user } = useSession()
@@ -46,6 +48,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <Route path="vault" element={<Vault />} />
               <Route path="team" element={<Team />} />
               <Route path="activity" element={<RoleOnly role="admin"><Activity /></RoleOnly>} />
+              <Route path="season" element={<Season />} />
+              <Route path="workload" element={<RoleOnly role="lead"><Workload /></RoleOnly>} />
               <Route path="attendance" element={<RoleOnly role="lead"><Attendance /></RoleOnly>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

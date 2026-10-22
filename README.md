@@ -50,6 +50,16 @@ team meetings you can see and your tasks with due dates.
 for lettering, travel eligibility and grant reports. Filter by date range and subteam; export to CSV. Everyone sees
 their own hours on Home.
 
+**Season.** Kickoff, competitions, deadlines and outreach days with a countdown on everyone's Home; they're in the
+calendar feed too.
+
+**Workload** (leads and mentors). Open, overdue, due-this-week and stuck tasks per person across every board, with
+who has nothing assigned.
+
+**On phones,** boards show as cards (tap the status to change it) with a switch to the full table.
+
+**Keyboard shortcuts:** `c` new task, `/` search, `g` then `h`/`w`/`i`/`b`/`m`/`s`/`v`/`p` to jump, `?` for the list.
+
 **Recurring meetings.** Schedule a weekly series (up to 52) with the same agenda; delete the rest of a series in one go.
 
 **My work.** Every open task and subitem you own across all boards, grouped into Overdue, Today, Next 7 days and later.
@@ -64,7 +74,11 @@ attendance, decisions, and action items that are created as real tasks on a boar
 **Vault.** Shared team logins (Onshape, the FIRST dashboard, social accounts, shop Wi-Fi). Each entry is visible to
 everyone, leads and mentors, or mentors only. Passwords are revealed one at a time, hide after 20 seconds, and are cleared
 from the clipboard after 30. **Every reveal is logged with name, time and IP.** An entry can hold a 2FA key: the server
-hands out the 6-digit code, never the key.
+hands out the 6-digit code, never the key. A generator makes strong passwords, and new passwords are checked against
+known data breaches (Have I Been Pwned, k-anonymity: only 5 characters of the password's hash leave the browser).
+
+**Setup checklist.** Mentors get a short checklist on Home (add people, first board, meetings, events, vault,
+notifications) that ticks itself off.
 
 ## Roles
 

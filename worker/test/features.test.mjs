@@ -127,3 +127,40 @@ test('purchasing template', async () => {
   assert.equal(full.columns.find((c) => c.title === 'Total cost').settings.unit, '$')
   assert.deepEqual(full.board.hidden_builtins, ['priority'])
 })
+
+test('season events: leads manage, everyone sees upcoming, they appear in calendar feeds', async () => {
+  const app = await makeTeam()
+  assert.equal((await app.call('alex', 'POST', '/api/events', { name: 'x', starts_on: '2099-01-01' })).status, 403)
+  const ev = await app.call('lead', 'POST', '/api/events', { name: 'Lake City District', kind: 'competition', starts_on: '2099-03-05', ends_on: '2099-03-07', location: 'Lake City, MI', url: 'https://frc-events.firstinspires.org' })
+  assert.equal(ev.status, 201)
+  await app.call('lead', 'POST', '/api/events', { name: 'Old event', starts_on: '2000-01-01' })
+  assert.equal((await app.call('lead', 'POST', '/api/events', { name: 'Bad', starts_on: '2099-03-05', ends_on: '2099-03-01' })).status, 400)
+  assert.equal((await app.call('lead', 'POST', '/api/events', { name: 'Bad', starts_on: '2099-03-05', url: 'javascript:alert(1)' })).status, 400)
+  const upcoming = await app.call('alex', 'GET', '/api/events')
+  assert.deepEqual(upcoming.data.events.map((e) => e.name), ['Lake City District'])
+  assert.equal((await app.call('alex', 'GET', '/api/events?scope=all')).data.events.length, 2)
+  const { url } = (await app.call('alex', 'POST', '/api/me/calendar')).data
+  const feed = await app.call(null, 'GET', new URL(url).pathname)
+  assert.match(feed.data, /SUMMARY:Lake City District/)
+  assert.match(feed.data, /DTSTART;VALUE=DATE:20990305\r\nDTEND;VALUE=DATE:20990308/)
+  assert.equal((await app.call('lead', 'PATCH', `/api/events/${ev.data.event.id}`, { name: 'Lake City District Event' })).data.event.name, 'Lake City District Event')
+  assert.equal((await app.call('lead', 'DELETE', `/api/events/${ev.data.event.id}`)).status, 200)
+})
+
+test('workload: open, overdue, due this week, stuck and per-board counts per person', async () => {
+  const app = await makeTeam()
+  const b = (await app.call('lead', 'POST', '/api/boards', { name: 'Robot' })).data.board
+  const g = (await app.call('lead', 'GET', `/api/boards/${b.id}`)).data.groups[0]
+  const add = (fields) => app.call('lead', 'POST', '/api/items', { board_id: b.id, group_id: g.id, title: 't', ...fields })
+  const soon = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10)
+  await add({ assignee_id: 'usr_alex', due_date: '2000-01-01', priority: 'critical' })
+  await add({ assignee_id: 'usr_alex', due_date: soon, status: 'stuck' })
+  await add({ assignee_id: 'usr_alex', status: 'done' })
+  await add({})
+  const res = await app.call('lead', 'GET', '/api/reports/workload')
+  const alex = res.data.people.find((p) => p.user_id === 'usr_alex')
+  assert.deepEqual([alex.open, alex.overdue, alex.due_week, alex.stuck, alex.high], [2, 1, 1, 1, 1])
+  assert.deepEqual(alex.boards, [{ board_id: b.id, name: 'Robot', color: 'green', open: 2 }])
+  assert.equal(res.data.unassigned.open, 1)
+  assert.equal((await app.call('alex', 'GET', '/api/reports/workload')).status, 403)
+})

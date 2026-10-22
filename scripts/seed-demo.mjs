@@ -133,6 +133,16 @@ await call(lead, 'POST', '/meetings', { title: 'Weekly all-hands', starts_at: tu
   }
 }
 
+// The season: kickoff and competitions relative to today so the countdown always shows.
+for (const [name, kind, start, len, location] of [
+  ['FRC Kickoff', 'kickoff', 74, 0, 'Lake Orion High School'],
+  ['Stop build: robot bag-and-tag', 'deadline', 130, 0, ''],
+  ['FIM District Lake City Event', 'competition', 143, 2, 'Lake City, MI'],
+  ['FIM District Troy Event', 'competition', 157, 2, 'Troy, MI'],
+  ['Impact Award essay due', 'deadline', 40, 0, ''],
+  ['Library STEM night', 'outreach', 9, 0, 'Orion Township Public Library'],
+]) await call(lead, 'POST', '/events', { name, kind, starts_on: day(start), ends_on: day(start + len), location })
+
 for (const [name, url, username, secret, min_role, totp, notes] of [
   ['Onshape team account', 'https://cad.onshape.com', 'cad@example.org', 'demo-Onsh4pe!', 'lead', 'JBSWY3DPEHPK3PXP', ''],
   ['Shop Wi-Fi', '', 'Dragons302', 'demo-wifi-pass', 'member', null, 'SSID is Dragons302-5G in the shop.'],

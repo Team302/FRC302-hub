@@ -51,7 +51,7 @@ export function calendarRoutes(router, authed) {
 
     const kinds = ['general', 'subteam', 'build', 'leadership', 'mentor'].filter((k) => atLeast(user, KIND_MIN_ROLE[k] || 'member'))
     const since = new Date(Date.now() - 60 * 86400000).toISOString()
-    const [{ results: meetings }, { results: tasks }] = await Promise.all([
+    const [{ results: meetings }, { results: tasks }, { results: seasonEvents }] = await Promise.all([
       env.DB.prepare(
         `SELECT id, title, kind, starts_at, duration_min, location, status, subteam_id FROM meetings
           WHERE starts_at >= ? AND kind IN (${kinds.map(() => '?').join(', ')}) ORDER BY starts_at LIMIT 500`
@@ -60,6 +60,7 @@ export function calendarRoutes(router, authed) {
         `SELECT i.id, i.title, i.due_date, i.board_id, b.name AS board_name FROM items i JOIN boards b ON b.id = i.board_id
           WHERE i.assignee_id = ? AND i.status <> 'done' AND i.due_date IS NOT NULL AND b.is_archived = 0 LIMIT 500`
       ).bind(user.id).all(),
+      env.DB.prepare("SELECT id, name, starts_on, ends_on, location, url, notes FROM events WHERE ends_on >= date('now', '-60 days') ORDER BY starts_on LIMIT 200").all(),
     ])
     const origin = env.APP_URL ? new URL(env.APP_URL).origin : new URL(request.url).origin
     const body = buildCalendar({
@@ -70,6 +71,7 @@ export function calendarRoutes(router, authed) {
           uid: `${m.id}@302hub`, title: m.title, start: m.starts_at, minutes: m.duration_min, location: m.location,
           url: `${origin}/meetings/${m.id}`, description: `${origin}/meetings/${m.id}`,
         })),
+        ...seasonEvents.map((e) => ({ uid: `${e.id}@302hub`, title: e.name, date: e.starts_on, endDate: e.ends_on, location: e.location, url: e.url || undefined, description: e.notes || undefined })),
         ...tasks.map((t) => ({ uid: `${t.id}@302hub`, title: `Due: ${t.title}`, date: t.due_date, description: `${t.board_name}\n${origin}/boards/${t.board_id}?item=${t.id}`, url: `${origin}/boards/${t.board_id}?item=${t.id}` })),
       ],
     })

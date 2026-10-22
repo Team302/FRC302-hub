@@ -2,13 +2,14 @@
 // shown for a short while, then dropped from memory. Copying clears the clipboard after 30s
 // if it still holds what we put there (best-effort: browsers only allow it while focused).
 import { useEffect, useRef, useState } from 'react'
-import { Copy, Eye, EyeOff, ExternalLink, History, KeyRound, Lock, Pencil, Plus, Search, ShieldCheck, Smartphone } from 'lucide-react'
+import { Copy, Eye, EyeOff, ExternalLink, History, KeyRound, Lock, Pencil, Plus, Search, ShieldCheck, Smartphone, Wand2 } from 'lucide-react'
 import { del, get, patch, post } from '../lib/api'
 import { useSession } from '../context/Session'
 import { atLeast, VAULT_ACCESS } from '../lib/constants'
 import { fmtFull, parseServerTime, relative } from '../lib/format'
 import { useToast } from '../context/ToastContext'
 import useRun from '../lib/useRun'
+import { breachCount, generatePassword } from '../lib/passwords'
 import EmptyState from '../components/ui/EmptyState'
 import Modal from '../components/ui/Modal'
 import PageHeader from '../components/ui/PageHeader'
@@ -93,8 +94,16 @@ function EntryForm({ entry, user, users, onSaved, onClose, onDeleted }) {
   })
   const run = useRun()
   const [confirm, confirmDialog] = useConfirm()
+  const [showSecret, setShowSecret] = useState(false)
+  const [breach, setBreach] = useState(undefined) // undefined: not checked, null: couldn't check, n: times seen
+  const checkBreach = async (pw) => { if (pw) setBreach(await breachCount(pw)) }
   const submit = async (e) => {
     e.preventDefault()
+    if (form.secret) {
+      const seen = breach === undefined ? await breachCount(form.secret) : breach
+      setBreach(seen)
+      if (seen > 0 && !(await confirm({ title: 'Save a breached password?', message: `This password has appeared in ${seen.toLocaleString()} data breaches, so it’s among the first ones attackers try. Change it on the site and save the new one instead.`, confirmLabel: 'Save anyway', tone: 'danger' }))) return
+    }
     const body = { name: form.name, url: form.url, username: form.username, notes: form.notes, min_role: form.min_role }
     if (atLeast(user, 'admin')) body.owner_id = form.owner_id
     if (form.secret) body.secret = form.secret
@@ -119,8 +128,14 @@ function EntryForm({ entry, user, users, onSaved, onClose, onDeleted }) {
         <Field label="Name"><input className="input" required maxLength={100} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Onshape team account" /></Field>
         <Field label="Link"><input className="input" type="url" maxLength={500} value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://" /></Field>
         <Field label="Username / email"><input className="input" maxLength={200} autoComplete="off" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></Field>
-        <Field label={editing ? 'New password' : 'Password'} hint={editing && entry.has_secret ? 'Leave blank to keep the current one.' : undefined}>
-          <input className="input font-mono" type="password" autoComplete="new-password" maxLength={2000} value={form.secret} onChange={(e) => setForm({ ...form, secret: e.target.value })} />
+        <Field label={editing ? 'New password' : 'Password'} hint={breach > 0 ? undefined : editing && entry.has_secret ? 'Leave blank to keep the current one.' : undefined}>
+          <div className="flex gap-2">
+            <input className="input font-mono" type={showSecret ? 'text' : 'password'} autoComplete="new-password" maxLength={2000} value={form.secret}
+              onChange={(e) => { setForm({ ...form, secret: e.target.value }); setBreach(undefined) }} onBlur={() => checkBreach(form.secret)} />
+            <button type="button" className="btn-secondary btn-sm shrink-0" title="Generate a strong password" onClick={() => { const p = generatePassword(); setForm({ ...form, secret: p }); setShowSecret(true); setBreach(0) }}><Wand2 className="w-4 h-4" />Generate</button>
+          </div>
+          {breach > 0 && <span className="block text-xs text-status-danger mt-1">This password has shown up in {breach.toLocaleString()} data breaches. Attackers try these first; use Generate instead.</span>}
+          {breach === 0 && form.secret && <span className="block text-xs text-accent-700 mt-1">Not found in known data breaches.</span>}
         </Field>
         <Field label="Authenticator setup key (optional)" hint={editing && entry.has_totp ? '2FA is set up. Paste a new key to replace it.' : 'The text key or otpauth:// link shown when you enable 2FA. Then everyone with access can get codes.'}>
           <input className="input font-mono" autoComplete="off" maxLength={500} value={form.totp} onChange={(e) => setForm({ ...form, totp: e.target.value })} />

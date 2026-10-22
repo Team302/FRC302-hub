@@ -28,7 +28,7 @@ function nextDay(iso) {
   return d.toISOString().slice(0, 10)
 }
 
-// events: [{ uid, title, description?, location?, url?, start (ISO) + minutes } | { uid, title, date (YYYY-MM-DD) }]
+// events: [{ uid, title, description?, location?, url?, start (ISO) + minutes } | { uid, title, date (YYYY-MM-DD), endDate? }]
 export function buildCalendar({ name, events, now = new Date() }) {
   const lines = [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Team 302//302 Hub//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
@@ -37,7 +37,7 @@ export function buildCalendar({ name, events, now = new Date() }) {
   for (const e of events) {
     lines.push('BEGIN:VEVENT', `UID:${e.uid}`, `DTSTAMP:${utcStamp(now)}`)
     if (e.date) {
-      lines.push(`DTSTART;VALUE=DATE:${dateOnly(e.date)}`, `DTEND;VALUE=DATE:${dateOnly(nextDay(e.date))}`, 'TRANSP:TRANSPARENT')
+      lines.push(`DTSTART;VALUE=DATE:${dateOnly(e.date)}`, `DTEND;VALUE=DATE:${dateOnly(nextDay(e.endDate || e.date))}`, 'TRANSP:TRANSPARENT')
     } else {
       lines.push(`DTSTART:${utcStamp(e.start)}`, `DTEND:${utcStamp(new Date(new Date(e.start).getTime() + e.minutes * 60000))}`)
     }

@@ -7,10 +7,12 @@ import { useToast } from '../context/ToastContext'
 import { atLeast, boardStatuses, SWATCH } from '../lib/constants'
 import { todayIso } from '../lib/format'
 import EmptyState from '../components/ui/EmptyState'
+import SegmentedControl from '../components/ui/SegmentedControl'
 import { SkeletonTable } from '../components/ui/Skeleton'
 import { useConfirm } from '../components/list/useConfirm'
 import useBoard from '../components/board/useBoard'
 import BoardTable from '../components/board/BoardTable'
+import MobileList from '../components/board/MobileList'
 import ItemPanel from '../components/board/ItemPanel'
 import { boardColumns, ColumnEditor } from '../components/board/columns'
 import { AutomationsModal, BoardSettings, BulkBar, EMPTY_FILTER, FilterMenu, PersonFilter, SortMenu, sortItems } from '../components/board/controls'
@@ -47,6 +49,16 @@ export default function Board() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [automationsOpen, setAutomationsOpen] = useState(false)
   const [favorite, setFavorite] = useState(false)
+  // Phones get the card list for the Main table unless they ask for the full table.
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches)
+  const [phoneLayout, setPhoneLayout] = useState(() => readPref('hub302.phoneLayout', 'cards'))
+  useEffect(() => {
+    const m = window.matchMedia('(max-width: 767px)')
+    const on = () => setNarrow(m.matches)
+    m.addEventListener('change', on)
+    return () => m.removeEventListener('change', on)
+  }, [])
+  useEffect(() => writePref('hub302.phoneLayout', phoneLayout), [phoneLayout])
 
   useEffect(() => writePref(`hub302.view.${id}`, view), [id, view])
   useEffect(() => { setSelected(new Set()) }, [id])
@@ -189,7 +201,13 @@ export default function Board() {
         <span className="ml-auto text-xs text-brand-gray-500">{visible.length} of {data.items.filter((i) => !i.parent_id).length} tasks</span>
       </div>
 
-      {view === 'table' && (
+      {view === 'table' && narrow && (
+        <SegmentedControl className="mb-4" aria-label="Layout" value={phoneLayout} onChange={setPhoneLayout} options={[{ value: 'cards', label: 'Cards' }, { value: 'table', label: 'Full table' }]} />
+      )}
+      {view === 'table' && narrow && phoneLayout === 'cards' && (
+        <MobileList groups={data.groups} itemsByGroup={itemsByGroup} subitemsOf={subitemsOf} ctx={ctx} readOnly={!!data.board.is_archived} />
+      )}
+      {view === 'table' && !(narrow && phoneLayout === 'cards') && (
         <BoardTable groups={data.groups} cols={cols} itemsByGroup={itemsByGroup} subitemsOf={subitemsOf} ctx={ctx} canManage={canManage && !data.board.is_archived}
           dragEnabled={!sort && !data.board.is_archived} onAddColumn={(type) => setColumnEditor({ type })} columnHandlers={columnHandlers} groupHandlers={groupHandlers} />
       )}

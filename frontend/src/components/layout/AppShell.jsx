@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import Shortcuts from '../Shortcuts'
 import { useEnterAnimation } from '../ui/Motion'
 
 // Board pages keep one animation key across ?item= changes, so opening a task doesn't replay it.
@@ -28,6 +29,7 @@ export default function AppShell() {
       {mobileOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px] z-40 lg:hidden animate-fade-in" aria-hidden="true" onClick={() => setMobileOpen(false)} />
       )}
+      <Shortcuts />
       <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((p) => !p)} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Topbar onMenuClick={() => setMobileOpen(true)} />

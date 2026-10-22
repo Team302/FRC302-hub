@@ -79,7 +79,45 @@ function range(request) {
   return { from, to }
 }
 
+// Who has what: open tasks (and subitems) per active person across all active boards.
+export async function workloadReport(env) {
+  const [{ results: people }, { results: rows }] = await Promise.all([
+    env.DB.prepare('SELECT id, name, role, subteam_id FROM users WHERE is_active = 1 ORDER BY name COLLATE NOCASE').all(),
+    env.DB.prepare(
+      `SELECT i.assignee_id, i.board_id, b.name AS board_name, b.color AS board_color, i.status, i.priority, i.due_date
+         FROM items i JOIN boards b ON b.id = i.board_id
+        WHERE i.status <> 'done' AND b.is_archived = 0`
+    ).all(),
+  ])
+  const today = new Date().toISOString().slice(0, 10)
+  const week = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+  const blank = () => ({ open: 0, overdue: 0, due_week: 0, stuck: 0, high: 0, boards: {} })
+  const by = Object.fromEntries(people.map((p) => [p.id, blank()]))
+  const unassigned = blank()
+  for (const r of rows) {
+    const w = (r.assignee_id && by[r.assignee_id]) || (r.assignee_id ? null : unassigned)
+    if (!w) continue // owned by someone no longer on the team
+    w.open++
+    if (r.due_date && r.due_date < today) w.overdue++
+    else if (r.due_date && r.due_date <= week) w.due_week++
+    if (r.status === 'stuck') w.stuck++
+    if (r.priority === 'high' || r.priority === 'critical') w.high++
+    const b = (w.boards[r.board_id] ||= { board_id: r.board_id, name: r.board_name, color: r.board_color, open: 0 })
+    b.open++
+  }
+  const shape = (w) => ({ ...w, boards: Object.values(w.boards).sort((a, b) => b.open - a.open) })
+  return {
+    people: people.map((p) => ({ user_id: p.id, name: p.name, role: p.role, subteam_id: p.subteam_id, ...shape(by[p.id]) })),
+    unassigned: shape(unassigned),
+  }
+}
+
 export function reportRoutes(router, authed) {
+  router.get('/api/reports/workload', authed(async (_req, env, user) => {
+    requireRole(user, 'lead', 'Only leads and mentors can see everyone’s workload.')
+    return json(await workloadReport(env))
+  }))
+
   router.get('/api/reports/attendance', authed(async (request, env, user) => {
     requireRole(user, 'lead', 'Only leads and mentors can see everyone’s attendance.')
     return json(await attendanceReport(env, range(request)))
