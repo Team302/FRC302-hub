@@ -76,7 +76,7 @@ export function attachmentRoutes(router, authed) {
     const filename = cleanFilename(request.headers.get('X-Filename'))
     const type = (request.headers.get('Content-Type') || 'application/octet-stream').split(';')[0].trim().toLowerCase()
     const ext = extOf(filename)
-    if (!ALLOWED[type]?.includes(ext)) throw badRequest(`“${filename}” isn’t a file type the hub stores. Images, PDFs, office documents, CSV, ZIP and CAD exports (STEP, STL, DXF…) are fine.`)
+    if (!Object.hasOwn(ALLOWED, type) || !ALLOWED[type].includes(ext)) throw badRequest(`“${filename}” isn’t a file type the hub stores. Images, PDFs, office documents, CSV, ZIP and CAD exports (STEP, STL, DXF…) are fine.`)
     const declared = Number(request.headers.get('Content-Length') || 0)
     if (declared > MAX_BYTES) throw new HttpError(413, 'Files can be up to 15 MB.')
     const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM attachments WHERE item_id = ?').bind(item.id).first()

@@ -47,8 +47,15 @@ async function assertActive(env, userId) {
 }
 
 // Who can approve a task, i.e. mark it Done on a board that needs approval: a lead or mentor, or
-// the task's reviewer as long as they aren't also its owner.
-export const canApprove = (user, item) => atLeast(user, 'lead') || (!!item.reviewer_id && item.reviewer_id === user.id && item.assignee_id !== user.id)
+// the task's reviewer when the task has an owner who isn't them (a reviewer approving an ownerless
+// task could be approving their own work). approveCheck below also re-checks that the reviewer is
+// still eligible, since subteams can change after they were picked.
+export const canApprove = (user, item) => atLeast(user, 'lead') || (!!item.reviewer_id && item.reviewer_id === user.id && !!item.assignee_id && item.assignee_id !== user.id)
+
+export async function approveCheck(env, user, board, item) {
+  if (!canApprove(user, item)) return false
+  return atLeast(user, 'lead') || canReview(env, board, user.id, item.assignee_id)
+}
 
 const APPROVAL_NEEDED = 'This board needs a review before a task is Done. Submit it for review, and the reviewer (or a lead) approves it.'
 
@@ -144,7 +151,7 @@ export async function updateItem(env, user, item, changes, depth = 0) {
   else if (changes.assignee_id !== undefined && changes.assignee_id !== item.assignee_id && next.reviewer_id && !board.subteam_id && !(await canReview(env, board, next.reviewer_id, next.assignee_id))) {
     throw badRequest('The reviewer isn’t on the new owner’s subteam. Change the reviewer too.')
   }
-  if (next.status === 'done' && item.status !== 'done' && board.require_approval && !canApprove(user, next)) throw forbidden(APPROVAL_NEEDED)
+  if (next.status === 'done' && item.status !== 'done' && board.require_approval && !(await approveCheck(env, user, board, next))) throw forbidden(APPROVAL_NEEDED)
   const sets = []
   const binds = []
   const stmts = []

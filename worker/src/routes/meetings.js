@@ -113,8 +113,10 @@ export function meetingRoutes(router, authed) {
     requireRole(user, 'lead')
     const meeting = await getMeeting(env, user, request.params.id)
     if (!meeting.series_id) throw badRequest('This meeting isn’t part of a series.')
-    const res = await env.DB.prepare("DELETE FROM meetings WHERE series_id = ? AND starts_at >= ? AND status = 'scheduled'")
-      .bind(meeting.series_id, meeting.starts_at).run()
+    // Only meetings this person can see: a later one made mentor-only isn't deleted unseen.
+    const kinds = visibleKinds(user)
+    const res = await env.DB.prepare(`DELETE FROM meetings WHERE series_id = ? AND starts_at >= ? AND status = 'scheduled' AND kind IN (${kinds.map(() => '?').join(', ')})`)
+      .bind(meeting.series_id, meeting.starts_at, ...kinds).run()
     await logActivity(env, request, user, { action: 'meeting.delete', entity: 'meeting', entityId: meeting.id, summary: `Deleted ${res.meta.changes} meetings from the “${meeting.title}” series` })
     return json({ deleted: res.meta.changes })
   }))
@@ -154,6 +156,10 @@ export function meetingRoutes(router, authed) {
       decisions: v.text(body.decisions, 'Decisions', { max: 10000 }),
     }
     if (next.kind === 'mentor' || (next.kind && meeting.kind === 'mentor')) requireRole(user, 'admin')
+    // A facilitator runs the meeting; changing who can see it, or who runs it, takes a lead.
+    if ((next.kind !== undefined && next.kind !== meeting.kind) || (next.facilitator_id !== undefined && next.facilitator_id !== meeting.facilitator_id)) {
+      requireRole(user, 'lead', 'Only a lead can change the meeting type or who runs it.')
+    }
     const sets = []
     const binds = []
     for (const [col, val] of Object.entries(next)) if (val !== undefined) { sets.push(`${col} = ?`); binds.push(val) }
@@ -313,7 +319,8 @@ export function meetingRoutes(router, authed) {
       assignee_id: v.id(body.assignee_id, 'Owner'),
       due_date: v.date(body.due_date, 'Due date'),
       priority: 'medium',
-      description: `From meeting: ${meeting.title}`,
+      // Members can read the task, so a restricted meeting's title stays out of it.
+      description: KIND_MIN_ROLE[meeting.kind] ? 'From a meeting' : `From meeting: ${meeting.title}`,
       source_meeting_id: meeting.id,
     })
     return json({ item }, { status: 201 })

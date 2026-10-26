@@ -30,6 +30,11 @@ export function teamRoutes(router, authed) {
   router.patch('/api/me', authed(async (request, env, user) => {
     const body = await readBody(request)
     const name = v.text(body.name, 'Name', { max: 80, required: true })
+    // Names show on notifications ("Mentor Mo assigned you…"), so no one can take another active
+    // person's name.
+    if (await env.DB.prepare('SELECT 1 FROM users WHERE is_active = 1 AND id <> ? AND lower(trim(name)) = lower(?)').bind(user.id, name.trim()).first()) {
+      throw conflict('Someone on the team already has that name. Add a last initial.', 'name_taken')
+    }
     await env.DB.prepare('UPDATE users SET name = ? WHERE id = ?').bind(name, user.id).run()
     return json({ user: { ...user, name } })
   }))
@@ -86,6 +91,13 @@ export function teamRoutes(router, authed) {
     if (isActive !== undefined) { sets.push('is_active = ?'); binds.push(isActive ? 1 : 0) }
     if (!sets.length) throw badRequest('Nothing to change.')
     await env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).bind(...binds, target.id).run()
+    // Removal takes effect on their devices too: no more pushes, and their calendar link stops.
+    if (isActive === false) {
+      await env.DB.batch([
+        env.DB.prepare('DELETE FROM push_subscriptions WHERE user_id = ?').bind(target.id),
+        env.DB.prepare('UPDATE users SET calendar_token_hash = NULL WHERE id = ?').bind(target.id),
+      ])
+    }
     const changes = [role && role !== target.role && `role ${target.role} → ${role}`, isActive === false && 'removed', isActive === true && !target.is_active && 'reactivated'].filter(Boolean)
     await logActivity(env, request, user, { action: 'user.update', entity: 'user', entityId: target.id, summary: `${target.name}: ${changes.join(', ') || 'details changed'}` })
     const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(target.id).first()

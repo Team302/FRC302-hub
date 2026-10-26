@@ -100,7 +100,9 @@ export async function encryptPayload(payload, p256dh, auth, { salt = crypto.getR
 // (404/410) are deleted. Never throws: a push failure must not break the request that caused it.
 export async function pushToUser(env, userId, message) {
   if (!pushConfigured(env)) return { sent: 0 }
-  const { results } = await env.DB.prepare('SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?').bind(userId).all()
+  const { results } = await env.DB.prepare(
+    'SELECT s.id, s.endpoint, s.p256dh, s.auth FROM push_subscriptions s JOIN users u ON u.id = s.user_id WHERE s.user_id = ? AND u.is_active = 1'
+  ).bind(userId).all()
   let sent = 0
   await Promise.all(results.map(async (sub) => {
     try {

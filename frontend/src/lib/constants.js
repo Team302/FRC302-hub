@@ -52,7 +52,7 @@ export function reviewerOptions(users, board, ownerId) {
 // Why Done is locked for this person on this task, or null when it isn't.
 export const doneLock = (user, board, item) => (board?.require_approval && item.status !== 'done' && !canApprove(user, item)
   ? (item.reviewer_id ? 'Needs approval: submit for review' : 'Needs approval: pick a reviewer, then submit for review') : null)
-export const canApprove = (user, item) => atLeast(user, 'lead') || (!!item.reviewer_id && item.reviewer_id === user?.id && item.assignee_id !== user?.id)
+export const canApprove = (user, item) => atLeast(user, 'lead') || (!!item.reviewer_id && item.reviewer_id === user?.id && !!item.assignee_id && item.assignee_id !== user?.id)
 
 export const MEETING_KINDS = [
   { id: 'general', label: 'All-team' },

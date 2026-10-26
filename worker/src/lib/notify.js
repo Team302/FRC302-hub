@@ -1,11 +1,15 @@
 // In-app notifications (the bell), mirrored to the person's devices as Web Push when they have
-// turned it on (lib/webpush.js). Nobody is notified about their own action.
+// turned it on (lib/webpush.js). Nobody is notified about their own action, and people who have
+// been removed from the team are never notified.
 import { pushConfigured, pushToUser } from './webpush.js'
 
-const PUSH_TITLE = { assigned: 'Assigned to you', mentioned: 'You were mentioned', update: 'New update', status: 'Status changed', due: 'Due soon', automation: 'Automation' }
+const PUSH_TITLE = { assigned: 'Assigned to you', mentioned: 'You were mentioned', update: 'New update', status: 'Status changed', due: 'Due soon', automation: 'Automation', review: 'Review' }
 
 export async function notify(env, { userIds, actorId = null, kind, itemId = null, body }) {
-  const targets = [...new Set(userIds.filter(Boolean))].filter((id) => id !== actorId)
+  const wanted = [...new Set(userIds.filter(Boolean))].filter((id) => id !== actorId)
+  if (!wanted.length) return
+  const { results: active } = await env.DB.prepare(`SELECT id FROM users WHERE is_active = 1 AND id IN (${wanted.map(() => '?').join(', ')})`).bind(...wanted).all()
+  const targets = active.map((r) => r.id)
   if (!targets.length) return
   const text = body.slice(0, 300)
   await env.DB.batch(targets.map((uid) => env.DB.prepare(

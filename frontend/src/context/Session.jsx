@@ -6,7 +6,8 @@
 //   dev    local development: pick a seeded user. The token lives in sessionStorage (this tab only).
 //   off    nothing configured: say so instead of showing a broken sign-in.
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { get, post, setTokenSource, setUnauthorizedHandler } from '../lib/api'
+import { api, get, post, setTokenSource, setUnauthorizedHandler } from '../lib/api'
+import { forgetThisDevice } from '../lib/push'
 import { ROLE } from '../lib/constants'
 import FullPageLoader from '../components/brand/FullPageLoader'
 import SignInLayout from '../components/brand/SignInLayout'
@@ -20,7 +21,8 @@ export const useSession = () => useContext(SessionContext)
 const DEV_KEY = 'hub302.devToken'
 const INBOX_POLL_MS = 30000
 
-function TeamProvider({ onSignOut, children }) {
+function TeamProvider({ onSignOut: signOutOnly, children }) {
+  const onSignOut = useCallback(async () => { await forgetThisDevice(api); signOutOnly() }, [signOutOnly])
   const [user, setUser] = useState(null)
   const [users, setUsers] = useState([])
   const [subteams, setSubteams] = useState([])

@@ -160,6 +160,11 @@ Most users are under 18, so the app stores **name and email only**: no phone num
 Members can't see other people's emails. If your district has a data-privacy agreement process, run this through it.
 
 ### Other limits you should know about
+- **Vault notes are not secret.** The password and 2FA key are encrypted and every reveal is logged; the Notes field
+  is stored as plain text and shown to everyone who can see the entry, with no log. The form says so. Don't put
+  passwords, recovery codes or PINs in notes.
+- **No storage quota for attachments.** Each file is capped at 15 MB, but there's no per-person or team total yet;
+  watch the R2 bucket's size in the Cloudflare dashboard.
 - **Self check-in trusts the device.** It proves someone had the app open while the meeting was live, not that they were in
   the room. Whoever runs the meeting can correct any entry.
 - **Push notifications** reach phones and computers where someone turned them on (Inbox → Turn on). On iPhone/iPad

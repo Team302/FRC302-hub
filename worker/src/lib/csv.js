@@ -5,7 +5,8 @@ export function csvCell(val) {
   if (val === null || val === undefined) return ''
   if (typeof val === 'number') return Number.isFinite(val) ? String(val) : ''
   let s = String(val)
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
+  // Leading whitespace too: some importers trim before they evaluate.
+  if (/^[\s\u00a0]*[=+\-@]/.test(s) || /^[\t\r]/.test(s)) s = `'${s}`
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 

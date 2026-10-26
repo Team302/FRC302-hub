@@ -4,12 +4,13 @@
 import { atLeast } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 import { badRequest, conflict, forbidden, json, newId, notFound, readBody } from '../lib/http.js'
-import { canApprove, createItem, getItem, ITEM_COLUMNS, PRIORITIES, setValue, STATUSES, updateItem } from '../lib/items.js'
+import { approveCheck, createItem, getItem, ITEM_COLUMNS, PRIORITIES, setValue, STATUSES, updateItem } from '../lib/items.js'
 import { notify, resolveMentions } from '../lib/notify.js'
 import { sqlNow } from '../lib/trash.js'
 import * as v from '../lib/validate.js'
 
 const MAX_BULK = 200
+const MEETING_MIN_ROLE = { leadership: 'lead', mentor: 'admin' }
 
 function itemChanges(body) {
   return {
@@ -89,7 +90,7 @@ export function itemRoutes(router, authed) {
     return json({ item }, { status: 201 })
   }))
 
-  router.get('/api/items/:id', authed(async (request, env) => {
+  router.get('/api/items/:id', authed(async (request, env, user) => {
     const item = await getItem(env, request.params.id)
     const [{ results: updates }, { results: events }, { results: subitems }, parent, meeting] = await Promise.all([
       env.DB.prepare(
@@ -102,9 +103,11 @@ export function itemRoutes(router, authed) {
       ).bind(item.id).all(),
       env.DB.prepare(`SELECT ${ITEM_COLUMNS} FROM live_items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.parent_id = ? ORDER BY i.position, i.created_at`).bind(item.id).all(),
       item.parent_id ? env.DB.prepare('SELECT id, title FROM live_items WHERE id = ?').bind(item.parent_id).first() : null,
-      item.source_meeting_id ? env.DB.prepare('SELECT id, title, starts_at FROM meetings WHERE id = ?').bind(item.source_meeting_id).first() : null,
+      item.source_meeting_id ? env.DB.prepare('SELECT id, title, starts_at, kind FROM meetings WHERE id = ?').bind(item.source_meeting_id).first() : null,
     ])
-    return json({ item, updates, events, subitems, parent, meeting })
+    // A task from a leadership or mentor meeting doesn't reveal that meeting to people who can't see it.
+    const visibleMeeting = meeting && atLeast(user, MEETING_MIN_ROLE[meeting.kind] || 'member') ? { id: meeting.id, title: meeting.title, starts_at: meeting.starts_at } : null
+    return json({ item, updates, events, subitems, parent, meeting: visibleMeeting })
   }))
 
   router.patch('/api/items/:id', authed(async (request, env, user) => {
@@ -151,7 +154,8 @@ export function itemRoutes(router, authed) {
   // Approve: the reviewer (or a lead) signs off and the task is Done.
   router.post('/api/items/:id/approve', authed(async (request, env, user) => {
     const item = await getItem(env, request.params.id)
-    if (!canApprove(user, item)) throw forbidden(item.assignee_id === user.id && item.reviewer_id === user.id ? 'You can’t approve your own task.' : 'Only the reviewer or a lead can approve this task.')
+    const board = await env.DB.prepare('SELECT * FROM boards WHERE id = ?').bind(item.board_id).first()
+    if (!(await approveCheck(env, user, board, item))) throw forbidden(item.reviewer_id === user.id && !item.assignee_id ? 'A task needs an owner before its reviewer can approve it.' : 'Only the reviewer or a lead can approve this task.')
     if (item.status === 'done') throw conflict('That task is already Done.')
     const updated = await updateItem(env, user, item, { status: 'done' })
     await env.DB.prepare("INSERT INTO item_events (item_id, actor_id, field, old_value, new_value) VALUES (?, ?, 'review', NULL, 'approved')").bind(item.id, user.id).run()
@@ -164,7 +168,8 @@ export function itemRoutes(router, authed) {
   // Request changes: back to Working on it, with the reviewer's note posted as an update.
   router.post('/api/items/:id/request-changes', authed(async (request, env, user) => {
     const item = await getItem(env, request.params.id)
-    if (!canApprove(user, item)) throw forbidden('Only the reviewer or a lead can send a task back.')
+    const board = await env.DB.prepare('SELECT * FROM boards WHERE id = ?').bind(item.board_id).first()
+    if (!(await approveCheck(env, user, board, item))) throw forbidden('Only the reviewer or a lead can send a task back.')
     if (item.status !== 'review') throw conflict('That task isn’t waiting for review.')
     const body = await readBody(request)
     const note = v.text(body.comment, 'What needs to change', { max: 2000, required: true })
@@ -207,9 +212,12 @@ export function itemRoutes(router, authed) {
     delete changes.description
     // All or nothing: check the review rule for every task before changing any.
     if (changes.status === 'done') {
-      const board = await env.DB.prepare('SELECT require_approval FROM boards WHERE id = ?').bind(items[0].board_id).first()
-      if (board?.require_approval && !items.every((i) => i.status === 'done' || canApprove(user, { ...i, ...(changes.reviewer_id !== undefined ? { reviewer_id: changes.reviewer_id } : {}) }))) {
-        throw forbidden('Some of those tasks need their reviewer (or a lead) to mark them Done.')
+      const board = await env.DB.prepare('SELECT * FROM boards WHERE id = ?').bind(items[0].board_id).first()
+      if (board?.require_approval) {
+        for (const i of items) {
+          const next = { ...i, ...(changes.reviewer_id !== undefined ? { reviewer_id: changes.reviewer_id } : {}), ...(changes.assignee_id !== undefined ? { assignee_id: changes.assignee_id } : {}) }
+          if (i.status !== 'done' && !(await approveCheck(env, user, board, next))) throw forbidden('Some of those tasks need their reviewer (or a lead) to mark them Done.')
+        }
       }
     }
     const out = []
