@@ -11,6 +11,7 @@ const WIDTH = { status: 140, people: 120, date: 116, timeline: 176, text: 180, n
 
 export const BUILTINS = [
   { key: 'owner', title: 'Owner', type: 'people', width: 120, hideable: true },
+  { key: 'reviewer', title: 'Reviewer', type: 'people', width: 120, hideable: true },
   { key: 'status', title: 'Status', type: 'status', width: 140, hideable: false },
   { key: 'priority', title: 'Priority', type: 'status', width: 116, hideable: true },
   { key: 'due', title: 'Due date', type: 'date', width: 116, hideable: true },
@@ -162,8 +163,8 @@ export function SummaryCell({ col, items, values, statuses, users }) {
   else if (col.key === 'due') {
     const dates = items.map((i) => i.due_date).filter(Boolean).sort()
     body = dates.length ? <span className="text-xs text-brand-gray-500 tabular-nums">{fmtShort(dates[0])}{dates.length > 1 && dates.at(-1) !== dates[0] ? ` – ${fmtShort(dates.at(-1))}` : ''}</span> : null
-  } else if (col.key === 'owner') {
-    const ids = [...new Set(items.map((i) => i.assignee_id).filter(Boolean))]
+  } else if (col.key === 'owner' || col.key === 'reviewer') {
+    const ids = [...new Set(items.map((i) => (col.key === 'owner' ? i.assignee_id : i.reviewer_id)).filter(Boolean))]
     body = ids.length ? <AvatarGroup size="xs" max={4} people={ids.map((id) => ({ id, name: users.find((u) => u.id === id)?.name || '' }))} /> : null
   } else if (col.type === 'status') {
     body = <Distribution label={col.title} total={n} parts={[...col.column.settings.labels.map((l) => ({ id: l.id, label: l.label, fill: LABEL_FILL[l.color][0], count: vals.filter((v) => v === l.id).length })), { id: '_', label: 'Empty', fill: 'rgb(var(--brand-gray-200))', count: n - vals.length }]} />

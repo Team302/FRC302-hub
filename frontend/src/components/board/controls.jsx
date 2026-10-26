@@ -161,10 +161,10 @@ export function BulkBar({ count, groups, statuses, users, onStatus, onOwner, onM
 }
 
 export function BoardSettings({ board, onClose, onSave, onArchive, onDelete, canDelete }) {
-  const [form, setForm] = useState({ name: board.name, description: board.description, labels: Object.fromEntries(STATUSES.map((s) => [s.id, board.status_labels?.[s.id]?.label || ''])), hidden: board.hidden_builtins || [] })
+  const [form, setForm] = useState({ name: board.name, description: board.description, labels: Object.fromEntries(STATUSES.map((s) => [s.id, board.status_labels?.[s.id]?.label || ''])), hidden: board.hidden_builtins || [], approval: !!board.require_approval })
   const save = async () => {
     const status_labels = Object.fromEntries(Object.entries(form.labels).filter(([, v]) => v.trim()).map(([k, v]) => [k, { label: v.trim() }]))
-    if (await onSave({ name: form.name.trim(), description: form.description, status_labels, hidden_builtins: form.hidden })) onClose()
+    if (await onSave({ name: form.name.trim(), description: form.description, status_labels, hidden_builtins: form.hidden, require_approval: form.approval })) onClose()
   }
   return (
     <Modal open onClose={onClose} title="Board settings" size="md"
@@ -187,11 +187,18 @@ export function BoardSettings({ board, onClose, onSave, onArchive, onDelete, can
         <div>
           <span className="label">Built-in columns</span>
           <div className="flex flex-wrap gap-4">
-            {[['owner', 'Owner'], ['priority', 'Priority'], ['due', 'Due date']].map(([k, l]) => (
+            {[['owner', 'Owner'], ['reviewer', 'Reviewer'], ['priority', 'Priority'], ['due', 'Due date']].map(([k, l]) => (
               <label key={k} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!form.hidden.includes(k)} onChange={(e) => setForm({ ...form, hidden: e.target.checked ? form.hidden.filter((h) => h !== k) : [...form.hidden, k] })} />{l}</label>
             ))}
           </div>
         </div>
+        <label className="flex items-start gap-3 rounded-xl border border-brand-gray-200 p-3 cursor-pointer">
+          <input type="checkbox" className="mt-0.5" checked={form.approval} onChange={(e) => setForm({ ...form, approval: e.target.checked, hidden: e.target.checked ? form.hidden.filter((h) => h !== 'reviewer') : form.hidden })} />
+          <span>
+            <span className="block text-sm font-medium">Done needs approval</span>
+            <span className="block text-xs text-brand-gray-500 mt-0.5">Only a task’s reviewer, a lead or a mentor can mark it Done. Owners submit for review instead. Applies to bulk edits and automations too.</span>
+          </span>
+        </label>
         <div className="pt-4 border-t border-brand-gray-200 flex flex-wrap gap-2">
           <button type="button" className="btn-secondary btn-sm" onClick={onArchive}>{board.is_archived ? 'Restore board' : 'Archive board'}</button>
           {canDelete && <button type="button" className="btn-danger btn-sm" onClick={onDelete}>Delete board</button>}

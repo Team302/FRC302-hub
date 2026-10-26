@@ -44,7 +44,7 @@ function GroupLabel({ children, collapsed, action }) {
 }
 
 export default function Sidebar({ collapsed, onToggle, mobileOpen = false, onClose }) {
-  const { user, boards, unread, openNew } = useSession()
+  const { user, boards, unread, toReview, openNew } = useSession()
   const { pathname } = useLocation()
   const isDesktop = useIsDesktop()
   const hidden = !isDesktop && !mobileOpen
@@ -71,7 +71,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen = false, onClo
 
       <nav aria-label="Main navigation" className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5">
         <NavRow to="/" end icon={Home} label="Home" collapsed={collapsed} onNavigate={onClose} />
-        <NavRow to="/my-work" icon={ListChecks} label="My work" collapsed={collapsed} onNavigate={onClose} />
+        <NavRow to="/my-work" icon={ListChecks} label="My work" collapsed={collapsed} badge={toReview} onNavigate={onClose} />
         <NavRow to="/inbox" icon={Inbox} label="Inbox" collapsed={collapsed} badge={unread} onNavigate={onClose} />
         <GroupLabel collapsed={collapsed}>Team</GroupLabel>
         <NavRow to="/season" icon={Trophy} label="Season" collapsed={collapsed} onNavigate={onClose} />

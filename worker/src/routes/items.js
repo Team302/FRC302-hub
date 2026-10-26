@@ -4,7 +4,7 @@
 import { atLeast } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 import { badRequest, conflict, forbidden, json, newId, notFound, readBody } from '../lib/http.js'
-import { createItem, getItem, ITEM_COLUMNS, PRIORITIES, setValue, STATUSES, updateItem } from '../lib/items.js'
+import { canApprove, createItem, getItem, ITEM_COLUMNS, PRIORITIES, setValue, STATUSES, updateItem } from '../lib/items.js'
 import { notify, resolveMentions } from '../lib/notify.js'
 import { sqlNow } from '../lib/trash.js'
 import * as v from '../lib/validate.js'
@@ -18,6 +18,7 @@ function itemChanges(body) {
     status: v.oneOf(body.status, 'Status', STATUSES),
     priority: v.oneOf(body.priority, 'Priority', PRIORITIES),
     assignee_id: v.id(body.assignee_id, 'Owner'),
+    reviewer_id: v.id(body.reviewer_id, 'Reviewer'),
     due_date: v.date(body.due_date, 'Due date'),
     group_id: v.id(body.group_id, 'Group', { nullable: false }),
   }
@@ -146,6 +147,38 @@ export function itemRoutes(router, authed) {
     return json({ items })
   }))
 
+  // ── Reviews ──
+  // Approve: the reviewer (or a lead) signs off and the task is Done.
+  router.post('/api/items/:id/approve', authed(async (request, env, user) => {
+    const item = await getItem(env, request.params.id)
+    if (!canApprove(user, item)) throw forbidden(item.assignee_id === user.id && item.reviewer_id === user.id ? 'You can’t approve your own task.' : 'Only the reviewer or a lead can approve this task.')
+    if (item.status === 'done') throw conflict('That task is already Done.')
+    const updated = await updateItem(env, user, item, { status: 'done' })
+    await env.DB.prepare("INSERT INTO item_events (item_id, actor_id, field, old_value, new_value) VALUES (?, ?, 'review', NULL, 'approved')").bind(item.id, user.id).run()
+    if (item.assignee_id && item.assignee_id !== user.id) {
+      await notify(env, { userIds: [item.assignee_id], actorId: user.id, kind: 'review', itemId: item.id, body: `${user.name} approved “${item.title}”` })
+    }
+    return json({ item: await getItem(env, updated.id) })
+  }))
+
+  // Request changes: back to Working on it, with the reviewer's note posted as an update.
+  router.post('/api/items/:id/request-changes', authed(async (request, env, user) => {
+    const item = await getItem(env, request.params.id)
+    if (!canApprove(user, item)) throw forbidden('Only the reviewer or a lead can send a task back.')
+    if (item.status !== 'review') throw conflict('That task isn’t waiting for review.')
+    const body = await readBody(request)
+    const note = v.text(body.comment, 'What needs to change', { max: 2000, required: true })
+    const updated = await updateItem(env, user, item, { status: 'working' })
+    await env.DB.batch([
+      env.DB.prepare('INSERT INTO item_updates (id, item_id, author_id, body) VALUES (?, ?, ?, ?)').bind(newId('upd'), item.id, user.id, `Changes requested: ${note}`),
+      env.DB.prepare("INSERT INTO item_events (item_id, actor_id, field, old_value, new_value) VALUES (?, ?, 'review', NULL, 'changes requested')").bind(item.id, user.id),
+    ])
+    if (item.assignee_id && item.assignee_id !== user.id) {
+      await notify(env, { userIds: [item.assignee_id], actorId: user.id, kind: 'review', itemId: item.id, body: `${user.name} asked for changes on “${item.title}”: ${note.slice(0, 140)}` })
+    }
+    return json({ item: await getItem(env, updated.id) })
+  }))
+
   router.post('/api/items/:id/duplicate', authed(async (request, env, user) => {
     return json({ item: await duplicateItem(env, user, await getItem(env, request.params.id)) }, { status: 201 })
   }))
@@ -172,6 +205,13 @@ export function itemRoutes(router, authed) {
     const changes = itemChanges(body.changes || {})
     delete changes.title
     delete changes.description
+    // All or nothing: check the review rule for every task before changing any.
+    if (changes.status === 'done') {
+      const board = await env.DB.prepare('SELECT require_approval FROM boards WHERE id = ?').bind(items[0].board_id).first()
+      if (board?.require_approval && !items.every((i) => i.status === 'done' || canApprove(user, { ...i, ...(changes.reviewer_id !== undefined ? { reviewer_id: changes.reviewer_id } : {}) }))) {
+        throw forbidden('Some of those tasks need their reviewer (or a lead) to mark them Done.')
+      }
+    }
     const out = []
     for (const item of items) out.push(await updateItem(env, user, item, item.parent_id ? { ...changes, group_id: undefined } : changes))
     return json({ items: out })
@@ -223,28 +263,37 @@ export function itemRoutes(router, authed) {
     return json({ ok: true })
   }))
 
-  // Everything assigned to me that isn't done (subitems included), soonest first.
+  // Everything assigned to me that isn't done (subitems included), soonest first, and what's
+  // waiting for my review.
   router.get('/api/my-work', authed(async (_req, env, user) => {
+    const { results: toReview } = await env.DB.prepare(
+      `SELECT ${ITEM_COLUMNS}, b.name AS board_name, b.color AS board_color, p.title AS parent_title
+         FROM live_items i JOIN boards b ON b.id = i.board_id LEFT JOIN users u ON u.id = i.assignee_id LEFT JOIN live_items p ON p.id = i.parent_id
+        WHERE i.reviewer_id = ? AND i.status = 'review' AND b.is_archived = 0
+        ORDER BY i.updated_at`
+    ).bind(user.id).all()
     const { results } = await env.DB.prepare(
       `SELECT ${ITEM_COLUMNS}, b.name AS board_name, b.color AS board_color, p.title AS parent_title
          FROM live_items i JOIN boards b ON b.id = i.board_id LEFT JOIN users u ON u.id = i.assignee_id LEFT JOIN live_items p ON p.id = i.parent_id
         WHERE i.assignee_id = ? AND i.status <> 'done' AND b.is_archived = 0
         ORDER BY i.due_date IS NULL, i.due_date, CASE i.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END`
     ).bind(user.id).all()
-    return json({ items: results })
+    return json({ items: results, to_review: toReview })
   }))
 
   // ── Notifications ──
   router.get('/api/notifications', authed(async (_req, env, user) => {
-    const [{ results }, unread] = await Promise.all([
+    const [{ results }, unread, toReview] = await Promise.all([
       env.DB.prepare(
         `SELECT n.id, n.kind, n.body, n.item_id, n.read_at, n.created_at, a.name AS actor_name, i.board_id
            FROM notifications n LEFT JOIN users a ON a.id = n.actor_id LEFT JOIN live_items i ON i.id = n.item_id
           WHERE n.user_id = ? ORDER BY n.id DESC LIMIT 50`
       ).bind(user.id).all(),
       env.DB.prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL').bind(user.id).first(),
+      env.DB.prepare("SELECT COUNT(*) AS n FROM live_items i JOIN boards b ON b.id = i.board_id WHERE i.reviewer_id = ? AND i.status = 'review' AND b.is_archived = 0").bind(user.id).first(),
     ])
-    return json({ notifications: results, unread: unread.n })
+    // to_review: tasks waiting on my review, for the badge on My work.
+    return json({ notifications: results, unread: unread.n, to_review: toReview.n })
   }))
 
   router.post('/api/notifications/read', authed(async (request, env, user) => {

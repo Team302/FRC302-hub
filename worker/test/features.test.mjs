@@ -125,7 +125,7 @@ test('purchasing template', async () => {
   const full = (await app.call('lead', 'GET', `/api/boards/${b.id}`)).data
   assert.deepEqual(full.groups.map((g) => g.name), ['Requested', 'Approved', 'Ordered', 'Received'])
   assert.equal(full.columns.find((c) => c.title === 'Total cost').settings.unit, '$')
-  assert.deepEqual(full.board.hidden_builtins, ['priority'])
+  assert.deepEqual(full.board.hidden_builtins, ['priority', 'reviewer'])
 })
 
 test('season events: leads manage, everyone sees upcoming, they appear in calendar feeds', async () => {

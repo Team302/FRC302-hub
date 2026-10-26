@@ -34,6 +34,14 @@ Ordered → Received, with vendor, link, quantity, cost totals per group and tra
 - **Automations:** "when status changes to Done, move it to Testing", "when Stuck, notify a mentor", "when a task is
   created, assign it to …". Loops are capped.
 - **Favorites** pin boards to the top of the sidebar.
+- **Reviews.** Every task can have a **Reviewer** besides its Owner (a group can set a default reviewer for new tasks).
+  The owner clicks **Submit for review**; the reviewer gets notified and the task is in their **Waiting for your
+  review** list on My work (with a count in the sidebar). They **Approve** (Done, with the sign-off recorded) or
+  **Request changes** (back to Working on it, with their note posted as an update). Workload shows how many reviews
+  each person has waiting.
+- **Done needs approval** (per board, in Settings, off by default): only the task's reviewer, a lead or a mentor can
+  mark it Done. The server enforces it for table edits, bulk edits, automations and new tasks. The owner can't be their
+  own reviewer, and on these boards a member can't make themselves the reviewer of someone else's task.
 - **Trash with Undo.** Deleting a task (or a bulk selection) shows an Undo; deleted tasks wait in the board's Trash for
   30 days with their subitems, values, updates and files, then the hourly job removes them for good. A lead, the task's
   creator, or whoever deleted it can restore it. Deleting a group or a board is still immediate.

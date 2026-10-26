@@ -31,7 +31,7 @@ function TitleEditor({ value, onSave, className = '', autoEdit = false, onDone }
     onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); onDone?.() } }} />
 }
 
-function GroupMenu({ group, isFirst, isLast, onRename, onColor, onMove, onDelete }) {
+function GroupMenu({ group, users, isFirst, isLast, onRename, onColor, onReviewer, onMove, onDelete }) {
   const item = 'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-brand-gray-700 rounded-md hover:bg-brand-gray-100 hover:text-brand-black'
   return (
     <Popover trigger={({ toggle, ref }) => <button ref={ref} type="button" onClick={toggle} className="btn-icon w-7 h-7" aria-label={`${group.name} group options`}><MoreHorizontal className="w-4 h-4" /></button>}>
@@ -44,6 +44,13 @@ function GroupMenu({ group, isFirst, isLast, onRename, onColor, onMove, onDelete
           <div className="px-3 pb-2 grid grid-cols-7 gap-1.5">
             {COLORS.map((c) => <button key={c} type="button" aria-label={c} onClick={() => { close(); onColor(c) }} className={`w-5 h-5 rounded ${SWATCH[c]} ${group.color === c ? 'ring-2 ring-offset-1 ring-brand-black/60' : ''}`} />)}
           </div>
+          <label className="block px-3 pb-2">
+            <span className="block text-[11px] text-brand-gray-400 mb-1">Default reviewer for new tasks</span>
+            <select className="input py-1 text-sm" value={group.default_reviewer_id || ''} onChange={(e) => { close(); onReviewer(e.target.value || null) }}>
+              <option value="">Nobody</option>
+              {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </label>
           <div className="my-1 border-t border-brand-gray-100" />
           <button type="button" className={`${item} text-status-danger hover:text-status-danger`} onClick={() => { close(); onDelete() }}><Trash2 className="w-3.5 h-3.5" />Delete group</button>
         </div>
@@ -86,6 +93,7 @@ function Row({ item, cols, ctx, titleW, depth, subCount, expanded, onToggleExpan
       {cols.map((col) => (
         <td key={col.key} className="p-0 border-b border-r border-brand-gray-200" style={{ width: col.width }}>
           {col.key === 'owner' ? <PeopleCell value={item.assignee_id} users={users} readOnly={!canEdit} onChange={(assignee_id) => actions.updateItem(item.id, { assignee_id })} />
+            : col.key === 'reviewer' ? <PeopleCell label="Reviewer" value={item.reviewer_id} users={users.filter((u) => u.id !== item.assignee_id)} readOnly={!canEdit} onChange={(reviewer_id) => actions.updateItem(item.id, { reviewer_id })} />
             : col.key === 'status' ? <StatusCell value={item.status} statuses={statuses} readOnly={!canEdit} onChange={(status) => actions.updateItem(item.id, { status })} />
               : col.key === 'priority' ? <PriorityCell value={item.priority} readOnly={!canEdit} onChange={(priority) => actions.updateItem(item.id, { priority })} />
                 : col.key === 'due' ? <DateCell due label="Due date" value={item.due_date} done={item.status === 'done'} readOnly={!canEdit} onChange={(due_date) => actions.updateItem(item.id, { due_date })} />
@@ -174,8 +182,10 @@ export default function BoardTable({ groups, cols, itemsByGroup, subitemsOf, ctx
                   <button type="button" onClick={() => canManage && setRenaming(group.id)} className={`text-[15px] font-semibold tracking-tight ${TEXT[group.color]} ${canManage ? 'hover:ring-1 hover:ring-brand-gray-300 rounded px-1 -mx-1' : 'cursor-default'}`}>{group.name}</button>
                 )}
                 <span className="text-xs text-brand-gray-500 ml-1">{items.length} {items.length === 1 ? 'task' : 'tasks'}</span>
-                {canManage && <GroupMenu group={group} isFirst={gi === 0} isLast={gi === groups.length - 1}
+                {group.default_reviewer_id && <span className="text-xs text-brand-gray-400">· reviewed by {ctx.users.find((u) => u.id === group.default_reviewer_id)?.name.split(' ')[0] || 'a former member'}</span>}
+                {canManage && <GroupMenu group={group} users={ctx.users} isFirst={gi === 0} isLast={gi === groups.length - 1}
                   onRename={() => setRenaming(group.id)} onColor={(color) => groupHandlers.update(group.id, { color })}
+                  onReviewer={(default_reviewer_id) => groupHandlers.update(group.id, { default_reviewer_id })}
                   onMove={(dir) => groupHandlers.move(group.id, dir)} onDelete={() => groupHandlers.remove(group)} />}
               </div>
 

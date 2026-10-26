@@ -84,6 +84,10 @@ export default function useBoard(boardId) {
       return res
     },
 
+    // Reviews. The server decides who may; a refusal rolls back with its reason in a toast.
+    approve: (id) => mutate(null, () => post(`/items/${id}/approve`), (d, res) => replaceItem(d, res.item)),
+    requestChanges: (id, comment) => mutate(null, () => post(`/items/${id}/request-changes`, { comment }), (d, res) => replaceItem(d, res.item)),
+
     bulkUpdate: (ids, changes) => mutate(
       (d) => ({ ...d, items: d.items.map((i) => (ids.includes(i.id) ? { ...i, ...(i.parent_id ? { ...changes, group_id: i.group_id } : changes) } : i)) }),
       () => post('/items/bulk', { ids, action: 'update', changes }),

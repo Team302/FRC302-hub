@@ -26,6 +26,7 @@ function TeamProvider({ onSignOut, children }) {
   const [subteams, setSubteams] = useState([])
   const [boards, setBoards] = useState([])
   const [unread, setUnread] = useState(0)
+  const [toReview, setToReview] = useState(0)
   const [newType, setNewType] = useState(null)
   const [error, setError] = useState(null)
 
@@ -35,7 +36,7 @@ function TeamProvider({ onSignOut, children }) {
     setSubteams(s.subteams)
   }, [])
   const refreshBoards = useCallback(() => get('/boards').then((d) => setBoards(d.boards)).catch(() => {}), [])
-  const refreshUnread = useCallback(() => get('/notifications').then((d) => setUnread(d.unread)).catch(() => {}), [])
+  const refreshUnread = useCallback(() => get('/notifications').then((d) => { setUnread(d.unread); setToReview(d.to_review || 0) }).catch(() => {}), [])
 
   useEffect(() => {
     let live = true
@@ -54,11 +55,11 @@ function TeamProvider({ onSignOut, children }) {
   }, [user, refreshUnread])
 
   const value = useMemo(() => ({
-    user, setUser, users, subteams, boards, unread, setUnread,
+    user, setUser, users, subteams, boards, unread, setUnread, toReview,
     refreshTeam, refreshBoards, refreshUnread, signOut: onSignOut, openNew: setNewType,
     userById: Object.fromEntries(users.map((u) => [u.id, u])),
     subteamById: Object.fromEntries(subteams.map((s) => [s.id, s])),
-  }), [user, users, subteams, boards, unread, refreshTeam, refreshBoards, refreshUnread, onSignOut])
+  }), [user, users, subteams, boards, unread, toReview, refreshTeam, refreshBoards, refreshUnread, onSignOut])
 
   if (error) {
     const notOnTeam = error.status === 401

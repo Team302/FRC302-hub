@@ -40,6 +40,9 @@ export const ROLES = [
 export const ROLE = Object.fromEntries(ROLES.map((r) => [r.id, r]))
 export const RANK = { member: 1, lead: 2, admin: 3 }
 export const atLeast = (user, role) => (RANK[user?.role] || 0) >= RANK[role]
+// Mirrors the server (worker/src/lib/items.js): a lead or mentor, or the task's reviewer when
+// they aren't also its owner. Only used to choose which buttons to show; the server decides.
+export const canApprove = (user, item) => atLeast(user, 'lead') || (!!item.reviewer_id && item.reviewer_id === user?.id && item.assignee_id !== user?.id)
 
 export const MEETING_KINDS = [
   { id: 'general', label: 'All-team' },

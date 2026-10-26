@@ -85,17 +85,19 @@ export async function workloadReport(env) {
   const [{ results: people }, { results: rows }] = await Promise.all([
     env.DB.prepare('SELECT id, name, role, subteam_id FROM users WHERE is_active = 1 ORDER BY name COLLATE NOCASE').all(),
     env.DB.prepare(
-      `SELECT i.assignee_id, i.board_id, b.name AS board_name, b.color AS board_color, i.status, i.priority, i.due_date
+      `SELECT i.assignee_id, i.reviewer_id, i.board_id, b.name AS board_name, b.color AS board_color, i.status, i.priority, i.due_date
          FROM live_items i JOIN boards b ON b.id = i.board_id
         WHERE i.status <> 'done' AND b.is_archived = 0`
     ).all(),
   ])
   const today = new Date().toISOString().slice(0, 10)
   const week = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
-  const blank = () => ({ open: 0, overdue: 0, due_week: 0, stuck: 0, high: 0, boards: {} })
+  const blank = () => ({ open: 0, overdue: 0, due_week: 0, stuck: 0, high: 0, reviewing: 0, boards: {} })
   const by = Object.fromEntries(people.map((p) => [p.id, blank()]))
   const unassigned = blank()
   for (const r of rows) {
+    // Waiting on someone's review counts against the reviewer too.
+    if (r.status === 'review' && r.reviewer_id && by[r.reviewer_id]) by[r.reviewer_id].reviewing++
     const w = (r.assignee_id && by[r.assignee_id]) || (r.assignee_id ? null : unassigned)
     if (!w) continue // owned by someone no longer on the team
     w.open++

@@ -1,7 +1,8 @@
 // The one place items change. Every route that creates or edits an item (the table, bulk
 // actions, meeting action items, automations) goes through here, so history, notifications and
 // automations behave the same no matter where the change came from.
-import { badRequest, conflict, newId, notFound } from './http.js'
+import { atLeast } from './auth.js'
+import { badRequest, conflict, forbidden, newId, notFound } from './http.js'
 import { cleanValue, describeValue } from './columns.js'
 import { notify } from './notify.js'
 
@@ -12,6 +13,8 @@ const MAX_AUTOMATION_DEPTH = 3
 
 export const ITEM_COLUMNS = `i.id, i.board_id, i.group_id, i.parent_id, i.title, i.description, i.status, i.priority, i.assignee_id,
   i.due_date, i.position, i.source_meeting_id, i.created_by, i.created_at, i.updated_at, i.completed_at,
+  i.reviewer_id, i.approved_by, i.approved_at,
+  (SELECT name FROM users WHERE id = i.reviewer_id) AS reviewer_name, (SELECT name FROM users WHERE id = i.approved_by) AS approved_by_name,
   u.name AS assignee_name, (SELECT COUNT(*) FROM item_updates iu WHERE iu.item_id = i.id) AS update_count`
 
 export async function getItem(env, id) {
@@ -43,6 +46,21 @@ async function assertActive(env, userId) {
   }
 }
 
+// Who can approve a task, i.e. mark it Done on a board that needs approval: a lead or mentor, or
+// the task's reviewer as long as they aren't also its owner.
+export const canApprove = (user, item) => atLeast(user, 'lead') || (!!item.reviewer_id && item.reviewer_id === user.id && item.assignee_id !== user.id)
+
+const APPROVAL_NEEDED = 'This board needs a review before a task is Done. Submit it for review, and the reviewer (or a lead) approves it.'
+
+// Reviewer rules: on the team, not the task's own owner, and on a board that needs approval,
+// nobody but a lead can make themselves the reviewer (or approving would be one click away).
+async function checkReviewer(env, user, board, reviewerId, assigneeId) {
+  if (!reviewerId) return
+  await assertActive(env, reviewerId)
+  if (reviewerId === assigneeId) throw badRequest('The reviewer has to be someone other than the owner.')
+  if (board.require_approval && reviewerId === user.id && !atLeast(user, 'lead')) throw forbidden('On this board only a lead can make themselves the reviewer.')
+}
+
 const event = (env, itemId, actorId, field, oldValue, newValue) => env.DB.prepare(
   'INSERT INTO item_events (item_id, actor_id, field, old_value, new_value) VALUES (?, ?, ?, ?, ?)'
 ).bind(itemId, actorId, field, oldValue == null ? null : String(oldValue).slice(0, 300), newValue == null ? null : String(newValue).slice(0, 300))
@@ -61,19 +79,32 @@ export async function createItem(env, user, fields, depth = 0) {
   const group = await env.DB.prepare('SELECT id, board_id FROM board_groups WHERE id = ?').bind(groupId).first()
   if (!group || group.board_id !== board.id) throw badRequest('That group is not on that board.')
   await assertActive(env, fields.assignee_id)
+  // A new top-level task picks up its group's default reviewer, unless that's its owner.
+  let reviewerId = fields.reviewer_id
+  if (reviewerId === undefined && !fields.parent_id) {
+    const g = await env.DB.prepare('SELECT default_reviewer_id FROM board_groups WHERE id = ?').bind(group.id).first()
+    reviewerId = g?.default_reviewer_id && g.default_reviewer_id !== fields.assignee_id ? g.default_reviewer_id : null
+    if (reviewerId && !(await env.DB.prepare('SELECT 1 FROM users WHERE id = ? AND is_active = 1').bind(reviewerId).first())) reviewerId = null
+  } else {
+    await checkReviewer(env, user, board, reviewerId, fields.assignee_id)
+  }
+  if (fields.status === 'done' && board.require_approval && !atLeast(user, 'lead')) throw forbidden(APPROVAL_NEEDED)
   const id = newId('itm')
   const pos = await env.DB.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM items WHERE group_id = ? AND parent_id IS ?').bind(group.id, fields.parent_id || null).first()
   const status = fields.status || 'not_started'
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO items (id, board_id, group_id, parent_id, title, description, status, priority, assignee_id, due_date, position, source_meeting_id, created_by, completed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${status === 'done' ? "datetime('now')" : 'NULL'})`
+      `INSERT INTO items (id, board_id, group_id, parent_id, title, description, status, priority, assignee_id, reviewer_id, due_date, position, source_meeting_id, created_by, completed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${status === 'done' ? "datetime('now')" : 'NULL'})`
     ).bind(id, board.id, group.id, fields.parent_id || null, fields.title, fields.description || '', status, fields.priority || 'medium',
-      fields.assignee_id || null, fields.due_date || null, fields.position ?? pos.p, fields.source_meeting_id || null, user.id),
+      fields.assignee_id || null, reviewerId || null, fields.due_date || null, fields.position ?? pos.p, fields.source_meeting_id || null, user.id),
     event(env, id, user.id, 'created', null, fields.title),
   ])
   if (fields.assignee_id) {
     await notify(env, { userIds: [fields.assignee_id], actorId: user.id, kind: 'assigned', itemId: id, body: `${user.name} assigned you “${fields.title}” on ${board.name}` })
+  }
+  if (reviewerId && reviewerId !== user.id) {
+    await notify(env, { userIds: [reviewerId], actorId: user.id, kind: 'review', itemId: id, body: `${user.name} made you the reviewer of “${fields.title}” on ${board.name}` })
   }
   const item = await getItem(env, id)
   if (!fields.parent_id) await runAutomations(env, user, board, item, { type: 'item_created' }, depth)
@@ -81,9 +112,15 @@ export async function createItem(env, user, fields, depth = 0) {
 }
 
 // ── Update built-in fields ──
-// changes: any of title, description, status, priority, assignee_id, due_date, group_id, position.
+// changes: any of title, description, status, priority, assignee_id, reviewer_id, due_date,
+// group_id, position.
 export async function updateItem(env, user, item, changes, depth = 0) {
   const board = await boardOf(env, item.board_id)
+  // The task as it will be, for the review rules.
+  const next = { ...item, ...Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== undefined)) }
+  if (changes.reviewer_id !== undefined && changes.reviewer_id !== item.reviewer_id) await checkReviewer(env, user, board, next.reviewer_id, next.assignee_id)
+  else if (changes.assignee_id !== undefined && next.reviewer_id && next.reviewer_id === next.assignee_id) throw badRequest('The owner can’t also be the reviewer. Change the reviewer first.')
+  if (next.status === 'done' && item.status !== 'done' && board.require_approval && !canApprove(user, next)) throw forbidden(APPROVAL_NEEDED)
   const sets = []
   const binds = []
   const stmts = []
@@ -105,12 +142,23 @@ export async function updateItem(env, user, item, changes, depth = 0) {
     changed[col] = val
   }
   if (!sets.length) return item
-  if ('status' in changed) sets.push(changed.status === 'done' ? "completed_at = datetime('now')" : 'completed_at = NULL')
+  if ('status' in changed) {
+    sets.push(changed.status === 'done' ? "completed_at = datetime('now')" : 'completed_at = NULL')
+    // Sign-off is recorded when the reviewer, or anyone on a board that needs approval, marks it
+    // Done; reopening the task clears it.
+    if (changed.status !== 'done') {
+      sets.push('approved_by = NULL', 'approved_at = NULL')
+    } else if (board.require_approval || (next.reviewer_id && next.reviewer_id === user.id)) {
+      sets.push('approved_by = ?', "approved_at = datetime('now')")
+      binds.push(user.id)
+    }
+  }
   sets.push("updated_at = datetime('now')")
 
-  const names = 'assignee_id' in changed ? (await activeUserIds(env)).names : {}
+  const names = 'assignee_id' in changed || 'reviewer_id' in changed ? (await activeUserIds(env)).names : {}
   for (const col of Object.keys(changed)) {
     if (col === 'position' || col === 'group_id') continue
+    if (col === 'reviewer_id') { stmts.push(event(env, item.id, user.id, 'reviewer', item.reviewer_name, names[changed.reviewer_id] || null)); continue }
     if (col === 'status') stmts.push(event(env, item.id, user.id, 'status', statusLabel(board, item.status), statusLabel(board, changed.status)))
     else if (col === 'assignee_id') stmts.push(event(env, item.id, user.id, 'owner', item.assignee_name, names[changed.assignee_id] || null))
     else if (col === 'description') stmts.push(event(env, item.id, user.id, 'description', null, 'edited'))
@@ -121,6 +169,12 @@ export async function updateItem(env, user, item, changes, depth = 0) {
   const title = changed.title || item.title
   if (changed.assignee_id) {
     await notify(env, { userIds: [changed.assignee_id], actorId: user.id, kind: 'assigned', itemId: item.id, body: `${user.name} assigned you “${title}” on ${board.name}` })
+  }
+  if (changed.reviewer_id && changed.reviewer_id !== user.id) {
+    await notify(env, { userIds: [changed.reviewer_id], actorId: user.id, kind: 'review', itemId: item.id, body: `${user.name} made you the reviewer of “${title}” on ${board.name}` })
+  }
+  if (changed.status === 'review' && next.reviewer_id) {
+    await notify(env, { userIds: [next.reviewer_id], actorId: user.id, kind: 'review', itemId: item.id, body: `${user.name} asked you to review “${title}” on ${board.name}` })
   }
   if ('status' in changed && item.assignee_id) {
     await notify(env, { userIds: [item.assignee_id], actorId: user.id, kind: 'status', itemId: item.id, body: `${user.name} set “${title}” to ${statusLabel(board, changed.status)}` })

@@ -37,8 +37,8 @@ export default function Workload() {
           <FilterChips className="mb-4" aria-label="Subteam" scroll value={subteam} onChange={setSubteam} options={[{ key: '', label: 'Everyone' }, ...subteams.map((s) => ({ key: s.id, label: s.name }))]} />
           {rows.length === 0 ? <div className="card"><EmptyState icon={Users} title="No one here" /></div> : (
             <div className="card overflow-x-auto">
-              <table className="table min-w-[760px]">
-                <thead><tr><th>Person</th><th className="w-[34%]">Open tasks</th><th className="text-right">Overdue</th><th className="text-right">Next 7 days</th><th className="text-right">Stuck</th><th>Boards</th></tr></thead>
+              <table className="table min-w-[840px]">
+                <thead><tr><th>Person</th><th className="w-[34%]">Open tasks</th><th className="text-right">Overdue</th><th className="text-right">Next 7 days</th><th className="text-right">Stuck</th><th className="text-right" title="Tasks waiting for their review">Reviewing</th><th>Boards</th></tr></thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.user_id}>
@@ -63,6 +63,7 @@ export default function Workload() {
                       <td className={`text-right tabular-nums ${r.overdue ? 'text-status-danger font-medium' : 'text-brand-gray-400'}`}>{r.overdue}</td>
                       <td className="text-right tabular-nums">{r.due_week || <span className="text-brand-gray-400">0</span>}</td>
                       <td className={`text-right tabular-nums ${r.stuck ? 'text-status-danger' : 'text-brand-gray-400'}`}>{r.stuck}</td>
+                      <td className={`text-right tabular-nums ${r.reviewing ? 'text-brand-black' : 'text-brand-gray-400'}`}>{r.reviewing}</td>
                       <td>
                         <div className="flex flex-wrap gap-1.5">
                           {r.boards.slice(0, 3).map((b) => (

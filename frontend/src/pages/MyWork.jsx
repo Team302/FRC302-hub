@@ -1,11 +1,12 @@
 // Everything assigned to me across boards, bucketed by when it's due (Monday's "My work").
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle2 } from 'lucide-react'
-import { get, patch } from '../lib/api'
+import { BadgeCheck, CheckCircle2, Eye } from 'lucide-react'
+import { get, patch, post } from '../lib/api'
 import { useToast } from '../context/ToastContext'
 import { STATUSES, SWATCH } from '../lib/constants'
-import { todayIso } from '../lib/format'
+import { parseServerTime, relative, todayIso } from '../lib/format'
+import Avatar from '../components/ui/Avatar'
 import PageHeader from '../components/ui/PageHeader'
 import EmptyState from '../components/ui/EmptyState'
 import { SkeletonTable } from '../components/ui/Skeleton'
@@ -25,8 +26,18 @@ const BUCKETS = [['overdue', 'Overdue'], ['today', 'Today'], ['week', 'Next 7 da
 
 export default function MyWork() {
   const [items, setItems] = useState(null)
-  const { error } = useToast()
-  useEffect(() => { get('/my-work').then((d) => setItems(d.items)) }, [])
+  const [toReview, setToReview] = useState([])
+  const { error, success } = useToast()
+  useEffect(() => { get('/my-work').then((d) => { setItems(d.items); setToReview(d.to_review || []) }) }, [])
+
+  // Approving from here; sending back needs a note, so that opens the task.
+  const approve = async (item) => {
+    try {
+      await post(`/items/${item.id}/approve`)
+      setToReview((list) => list.filter((i) => i.id !== item.id))
+      success('Approved', `“${item.title}” is Done.`)
+    } catch (e) { error('Couldn’t approve', e.message) }
+  }
 
   const update = async (item, changes) => {
     const before = items
@@ -37,7 +48,25 @@ export default function MyWork() {
   const today = todayIso()
   return (
     <div>
-      <PageHeader title="My work" subtitle="Open tasks and subitems you own, on every board." />
+      <PageHeader title="My work" subtitle="Open tasks and subitems you own, and what’s waiting for your review, on every board." />
+      {toReview.length > 0 && (
+        <section className="mb-6">
+          <h2 className="text-sm font-semibold mb-2 flex items-center gap-1.5"><Eye className="w-4 h-4 text-[#0b6bcb]" />Waiting for your review <span className="font-normal text-brand-gray-500">{toReview.length}</span></h2>
+          <ul className="card divide-y divide-brand-gray-100">
+            {toReview.map((i) => (
+              <li key={i.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                <Avatar name={i.assignee_name || '?'} seed={i.assignee_id} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <Link to={`/boards/${i.board_id}?item=${i.id}`} className="font-medium text-brand-black hover:text-accent-700">{i.title}</Link>
+                  <p className="text-xs text-brand-gray-500 truncate">{i.assignee_name || 'No owner'} · {i.board_name}{i.parent_title ? ` · subitem of ${i.parent_title}` : ''} · submitted {relative(parseServerTime(i.updated_at))}</p>
+                </div>
+                <Link to={`/boards/${i.board_id}?item=${i.id}`} className="btn-secondary btn-sm">Open</Link>
+                <button type="button" className="btn-primary btn-sm" onClick={() => approve(i)}><BadgeCheck className="w-3.5 h-3.5" />Approve</button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {!items ? <div className="card"><SkeletonTable rows={6} cols={4} /></div> : items.length === 0 ? (
         <div className="card"><EmptyState icon={CheckCircle2} title="Nothing assigned to you" message="When you own a task, it shows up here." /></div>
       ) : (

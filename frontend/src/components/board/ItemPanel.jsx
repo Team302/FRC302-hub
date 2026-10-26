@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Copy, History, ListTree, MessageSquare, Trash2, X } from 'lucide-react'
+import { BadgeCheck, CalendarDays, Copy, Eye, History, ListTree, MessageSquare, Send, Trash2, Undo2, X } from 'lucide-react'
 import { get, post } from '../../lib/api'
 import { useSession } from '../../context/Session'
 import { useToast } from '../../context/ToastContext'
-import { atLeast } from '../../lib/constants'
+import { atLeast, canApprove } from '../../lib/constants'
 import { parseServerTime, relative, fmtFull } from '../../lib/format'
 import Avatar from '../ui/Avatar'
 import SegmentedControl from '../ui/SegmentedControl'
@@ -83,6 +83,63 @@ function Field({ label, icon: Icon, children }) {
   )
 }
 
+// Where the task is in review, and the buttons for the next step: the owner submits, the reviewer
+// approves or sends it back with a note.
+function ReviewBar({ item, board, user, users, actions }) {
+  const [note, setNote] = useState(null) // null = closed; string = the request-changes draft
+  const [busy, setBusy] = useState(false)
+  const name = (id) => users.find((u) => u.id === id)?.name || 'a former member'
+  const run = async (fn) => { setBusy(true); try { return await fn() } finally { setBusy(false) } }
+  const approver = canApprove(user, item)
+
+  if (item.status === 'done') {
+    if (!item.approved_by) return null
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-accent-500/30 bg-accent-500/[0.07] px-4 py-2.5 text-sm">
+        <BadgeCheck className="w-4 h-4 text-accent-600 shrink-0" />
+        <span>Approved by <b className="font-medium">{name(item.approved_by)}</b>{item.approved_at && <span className="text-brand-gray-500"> · {relative(parseServerTime(item.approved_at))}</span>}</span>
+      </div>
+    )
+  }
+  if (item.status === 'review') {
+    return (
+      <div className="rounded-xl border border-[#0b6bcb]/30 bg-[#0b6bcb]/[0.07] px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <Eye className="w-4 h-4 text-[#0b6bcb] shrink-0" />
+          <span className="flex-1 min-w-0">{item.reviewer_id ? <>Waiting for <b className="font-medium">{item.reviewer_id === user.id ? 'your' : `${name(item.reviewer_id)}’s`}</b> review</> : 'Needs review, but no reviewer is set'}</span>
+          {approver && note === null && (
+            <>
+              <button type="button" className="btn-secondary btn-sm" disabled={busy} onClick={() => setNote('')}><Undo2 className="w-3.5 h-3.5" />Request changes</button>
+              <button type="button" className="btn-primary btn-sm" disabled={busy} onClick={() => run(() => actions.approve(item.id))}><BadgeCheck className="w-3.5 h-3.5" />Approve</button>
+            </>
+          )}
+        </div>
+        {note !== null && (
+          <form className="mt-3" onSubmit={async (e) => { e.preventDefault(); if (note.trim() && (await run(() => actions.requestChanges(item.id, note.trim())))) setNote(null) }}>
+            <textarea autoFocus className="input" rows={3} maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What needs to change? The owner gets this as an update." aria-label="What needs to change" />
+            <div className="flex justify-end gap-2 mt-2">
+              <button type="button" className="btn-ghost btn-sm" onClick={() => setNote(null)}>Cancel</button>
+              <button className="btn-primary btn-sm" disabled={busy || !note.trim()}>Send back</button>
+            </div>
+          </form>
+        )}
+      </div>
+    )
+  }
+  if (item.reviewer_id) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-gray-200 px-4 py-2.5 text-sm">
+        <span className="flex-1 min-w-0 text-brand-gray-600">Reviewer: <b className="font-medium text-brand-black">{name(item.reviewer_id)}</b>{board.require_approval ? ' · this board needs their approval to be Done' : ''}</span>
+        <button type="button" className="btn-secondary btn-sm" disabled={busy} onClick={() => run(() => actions.updateItem(item.id, { status: 'review' }))}><Send className="w-3.5 h-3.5" />Submit for review</button>
+      </div>
+    )
+  }
+  if (board.require_approval) {
+    return <p className="rounded-xl border border-dashed border-brand-gray-300 px-4 py-2.5 text-sm text-brand-gray-500">This board needs a review before a task is Done. Pick a reviewer below.</p>
+  }
+  return null
+}
+
 export default function ItemPanel({ itemId, board, data, statuses, actions, onClose, onOpen }) {
   const { user, users } = useSession()
   const { success } = useToast()
@@ -155,9 +212,11 @@ export default function ItemPanel({ itemId, board, data, statuses, actions, onCl
 
         <div className="flex-1 overflow-y-auto">
           <div className="px-6 py-4">
+            <div className="mb-3 empty:hidden"><ReviewBar item={item} board={board} user={user} users={users} actions={actions} /></div>
             <div className="card px-3">
               <Field label="Status"><StatusCell value={item.status} statuses={statuses} onChange={(status) => actions.updateItem(item.id, { status })} /></Field>
               {!hidden.includes('owner') && <Field label="Owner"><PeopleCell value={item.assignee_id} users={users} onChange={(assignee_id) => actions.updateItem(item.id, { assignee_id })} /></Field>}
+              <Field label="Reviewer"><PeopleCell label="Reviewer" value={item.reviewer_id} users={users.filter((u) => u.id !== item.assignee_id)} onChange={(reviewer_id) => actions.updateItem(item.id, { reviewer_id })} /></Field>
               {!hidden.includes('priority') && <Field label="Priority"><PriorityCell value={item.priority} onChange={(priority) => actions.updateItem(item.id, { priority })} /></Field>}
               {!hidden.includes('due') && <Field label="Due date"><DateCell due label="Due date" value={item.due_date} done={item.status === 'done'} onChange={(due_date) => actions.updateItem(item.id, { due_date })} /></Field>}
               {!item.parent_id && (

@@ -11,7 +11,7 @@ import { deleteFilesForBoard, deleteFilesForItems } from './attachments.js'
 import * as v from '../lib/validate.js'
 import { COLORS } from './team.js'
 
-const BUILTINS = ['owner', 'status', 'priority', 'due']
+const BUILTINS = ['owner', 'reviewer', 'status', 'priority', 'due']
 
 // Templates: groups, then extra columns as [type, title, settings].
 const opt = (label, color = 'gray') => ({ label, color })
@@ -137,7 +137,7 @@ export function boardRoutes(router, authed) {
     const color = v.oneOf(body.color ?? 'green', 'Color', COLORS)
     const template = TEMPLATES[v.oneOf(body.template ?? 'blank', 'Template', Object.keys(TEMPLATES))]
     const id = newId('brd')
-    const stmts = [env.DB.prepare('INSERT INTO boards (id, name, description, subteam_id, color, created_by, hidden_builtins) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(id, name, description, subteamId, color, user.id, JSON.stringify(template.hidden || []))]
+    const stmts = [env.DB.prepare('INSERT INTO boards (id, name, description, subteam_id, color, created_by, hidden_builtins) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(id, name, description, subteamId, color, user.id, JSON.stringify([...(template.hidden || []), 'reviewer']))]
     template.groups.forEach(([g, c], i) => stmts.push(env.DB.prepare('INSERT INTO board_groups (id, board_id, name, color, position) VALUES (?, ?, ?, ?, ?)').bind(newId('grp'), id, g, c, i)))
     template.columns.forEach(([type, title, settings], i) => stmts.push(env.DB.prepare('INSERT INTO board_columns (id, board_id, type, title, settings, position) VALUES (?, ?, ?, ?, ?, ?)')
       .bind(newId('col'), id, type, title, JSON.stringify(cleanSettings(type, settings)), i)))
@@ -151,7 +151,7 @@ export function boardRoutes(router, authed) {
     const [{ results: groups }, { results: items }, { results: columns }, { results: values }, auto] = await Promise.all([
       env.DB.prepare('SELECT * FROM board_groups WHERE board_id = ? ORDER BY position').bind(board.id).all(),
       env.DB.prepare(`SELECT i.id, i.board_id, i.group_id, i.parent_id, i.title, i.status, i.priority, i.assignee_id, i.due_date, i.position,
-                             i.created_by, i.created_at, i.updated_at, i.completed_at, u.name AS assignee_name,
+                             i.reviewer_id, i.approved_by, i.approved_at, i.created_by, i.created_at, i.updated_at, i.completed_at, u.name AS assignee_name,
                              (SELECT COUNT(*) FROM item_updates iu WHERE iu.item_id = i.id) AS update_count,
                              (SELECT COUNT(*) FROM attachments a WHERE a.item_id = i.id) AS file_count
                         FROM live_items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.board_id = ? ORDER BY i.position, i.created_at`).bind(board.id).all(),
@@ -175,6 +175,9 @@ export function boardRoutes(router, authed) {
       if (body.hidden_builtins.includes('status')) throw badRequest('The Status column can’t be hidden: it decides when a task is done.')
       hidden = JSON.stringify([...new Set(body.hidden_builtins)])
     }
+    const requireApproval = body.require_approval === undefined ? board.require_approval : (body.require_approval ? 1 : 0)
+    // Turning approvals on shows the Reviewer column, since every task now needs one to be Done.
+    if (requireApproval && !board.require_approval) hidden = JSON.stringify(JSON.parse(hidden ?? board.hidden_builtins).filter((h) => h !== 'reviewer'))
     const next = {
       name: v.text(body.name, 'Name', { max: 80, required: body.name !== undefined }) ?? board.name,
       description: v.text(body.description, 'Description', { max: 500 }) ?? board.description,
@@ -184,8 +187,11 @@ export function boardRoutes(router, authed) {
       status_labels: body.status_labels === undefined ? board.status_labels : JSON.stringify(cleanStatusLabels(body.status_labels)),
       hidden_builtins: hidden ?? board.hidden_builtins,
     }
-    await env.DB.prepare('UPDATE boards SET name = ?, description = ?, subteam_id = ?, color = ?, is_archived = ?, status_labels = ?, hidden_builtins = ? WHERE id = ?')
-      .bind(next.name, next.description, next.subteam_id, next.color, next.is_archived, next.status_labels, next.hidden_builtins, board.id).run()
+    await env.DB.prepare('UPDATE boards SET name = ?, description = ?, subteam_id = ?, color = ?, is_archived = ?, status_labels = ?, hidden_builtins = ?, require_approval = ? WHERE id = ?')
+      .bind(next.name, next.description, next.subteam_id, next.color, next.is_archived, next.status_labels, next.hidden_builtins, requireApproval, board.id).run()
+    if (requireApproval !== board.require_approval) {
+      await logActivity(env, request, user, { action: 'board.approval', entity: 'board', entityId: board.id, summary: `${requireApproval ? 'Turned on' : 'Turned off'} “Done needs approval” on ${next.name}` })
+    }
     return json({ board: presentBoard(await getBoard(env, board.id)) })
   }))
 
@@ -216,6 +222,7 @@ export function boardRoutes(router, authed) {
     for (const row of values) (valueMap[row.item_id] ||= {})[row.column_id] = JSON.parse(row.value)
     const builtins = [
       ['owner', 'Owner', (i) => i.assignee_name || ''],
+      ['reviewer', 'Reviewer', (i) => names[i.reviewer_id] || ''],
       ['status', 'Status', (i) => statusLabel(board, i.status)],
       ['priority', 'Priority', (i) => i.priority],
       ['due', 'Due date', (i) => i.due_date || ''],
@@ -290,8 +297,11 @@ export function boardRoutes(router, authed) {
     const body = await readBody(request)
     const name = v.text(body.name, 'Name', { max: 60, required: body.name !== undefined }) ?? group.name
     const color = v.oneOf(body.color, 'Color', COLORS) ?? group.color
-    await env.DB.prepare('UPDATE board_groups SET name = ?, color = ? WHERE id = ?').bind(name, color, group.id).run()
-    return json({ group: { ...group, name, color } })
+    const reviewer = v.id(body.default_reviewer_id, 'Default reviewer')
+    if (reviewer && !(await env.DB.prepare('SELECT 1 FROM users WHERE id = ? AND is_active = 1').bind(reviewer).first())) throw badRequest('That person is not on the team.')
+    const defaultReviewer = reviewer === undefined ? group.default_reviewer_id : reviewer
+    await env.DB.prepare('UPDATE board_groups SET name = ?, color = ?, default_reviewer_id = ? WHERE id = ?').bind(name, color, defaultReviewer, group.id).run()
+    return json({ group: { ...group, name, color, default_reviewer_id: defaultReviewer } })
   }))
 
   router.delete('/api/groups/:id', authed(async (request, env, user) => {

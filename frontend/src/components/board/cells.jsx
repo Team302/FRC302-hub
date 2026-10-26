@@ -74,7 +74,7 @@ export function LabelCell({ column, value, onChange, readOnly }) {
   )
 }
 
-function PeopleList({ users, selected, onToggle, multi }) {
+function PeopleList({ users, selected, onToggle, multi, label = 'Owner' }) {
   const [q, setQ] = useState('')
   const shown = users.filter((u) => u.name.toLowerCase().includes(q.trim().toLowerCase()))
   return (
@@ -92,7 +92,7 @@ function PeopleList({ users, selected, onToggle, multi }) {
           )
         })}
         {shown.length === 0 && <p className="px-3 py-2 text-xs text-brand-gray-500">No one matches.</p>}
-        {!multi && selected.length > 0 && <button type="button" onClick={() => onToggle(null)} className="w-full px-3 py-1.5 text-left text-xs text-brand-gray-500 hover:bg-brand-gray-100">Remove owner</button>}
+        {!multi && selected.length > 0 && <button type="button" onClick={() => onToggle(null)} className="w-full px-3 py-1.5 text-left text-xs text-brand-gray-500 hover:bg-brand-gray-100">Remove {label.toLowerCase()}</button>}
       </div>
     </div>
   )
@@ -115,7 +115,7 @@ export function PeopleCell({ value, users, onChange, readOnly, multi = false, la
       </button>
     )}>
       {(close) => (
-        <PeopleList users={users} multi={multi} selected={ids} onToggle={(id) => {
+        <PeopleList users={users} multi={multi} label={label} selected={ids} onToggle={(id) => {
           if (!multi) { onChange(id === ids[0] ? null : id); close(); return }
           const next = ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
           onChange(next.length ? next : null)
