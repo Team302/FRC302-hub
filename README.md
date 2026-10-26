@@ -79,6 +79,14 @@ who has nothing assigned.
 
 **Keyboard shortcuts:** `c` new task, `/` search, `g` then `h`/`w`/`i`/`b`/`m`/`s`/`v`/`p` to jump, `?` for the list.
 
+**Shop kiosk** (leads: Meetings → Shop kiosk). A link to open on a tablet by the shop door. While a build session,
+general or subteam meeting is running, students find their name (first name + last initial), tap it, confirm, and
+they're checked in, on time or late. The tablet isn't signed in as anyone: the link can only list names and record
+check-ins, never shows leadership or mentor meetings, and stores nothing on the tablet. Every kiosk check-in is labelled
+with the kiosk it came from on the meeting page, and the person running the meeting can change any of them. Links last
+120 days and can be turned off at any time. The screen stays awake while the kiosk page is open (where the browser
+allows it).
+
 **Recurring meetings.** Schedule a weekly series (up to 52) with the same agenda; delete the rest of a series in one go.
 
 **My work.** Every open task and subitem you own across all boards, grouped into Overdue, Today, Next 7 days and later.
@@ -165,6 +173,8 @@ Members can't see other people's emails. If your district has a data-privacy agr
   passwords, recovery codes or PINs in notes.
 - **No storage quota for attachments.** Each file is capped at 15 MB, but there's no per-person or team total yet;
   watch the R2 bucket's size in the Cloudflare dashboard.
+- **The kiosk trusts whoever is at the tablet.** Anyone standing there can check in a friend who isn't there. It's
+  better evidence than self check-in (the tablet is in the shop), not proof. Check the count against the room.
 - **Self check-in trusts the device.** It proves someone had the app open while the meeting was live, not that they were in
   the room. Whoever runs the meeting can correct any entry.
 - **Push notifications** reach phones and computers where someone turned them on (Inbox → Turn on). On iPhone/iPad

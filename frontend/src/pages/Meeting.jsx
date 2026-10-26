@@ -156,7 +156,7 @@ function Run({ data, setData, users, run, reload }) {
   const act = async (path, body) => { if (await run(() => post(`/meetings/${meeting.id}/${path}`, body))) await reload() }
   const mark = async (person) => {
     const status = ATTEND_NEXT[person.status]
-    setData((d) => ({ ...d, attendance: d.attendance.map((a) => (a.id === person.id ? { ...a, status } : a)) }))
+    setData((d) => ({ ...d, attendance: d.attendance.map((a) => (a.id === person.id ? { ...a, status, via: null, via_kiosk: null } : a)) }))
     await run(() => put(`/meetings/${meeting.id}/attendance/${person.id}`, { status }))
   }
   const markRestPresent = async () => {
@@ -257,6 +257,7 @@ function Run({ data, setData, users, run, reload }) {
                   <button type="button" disabled={!canRun} onClick={() => mark(p)} className="w-full flex items-center gap-2.5 rounded-lg px-3 py-1.5 hover:bg-brand-gray-100 disabled:hover:bg-transparent text-left">
                     <Avatar name={p.name} seed={p.id} size="sm" />
                     <span className="flex-1 text-sm truncate">{p.name}</span>
+                    {s && p.via && <span className="text-[11px] text-brand-gray-400" title={p.via_kiosk ? `Checked in at the “${p.via_kiosk}” kiosk` : 'Checked in from their own device'}>{p.via_kiosk ? `kiosk · ${p.via_kiosk}` : 'self'}</span>}
                     {s ? <span style={{ backgroundColor: s.fill, color: s.ink }} className="text-[11px] font-medium rounded-full px-2 py-0.5">{s.label}</span> : <span className="text-[11px] text-brand-gray-400">—</span>}
                   </button>
                 </li>

@@ -20,6 +20,7 @@ import Inbox from './pages/Inbox'
 import Attendance from './pages/Attendance'
 import Season from './pages/Season'
 import Workload from './pages/Workload'
+import Kiosk from './pages/Kiosk'
 
 function RoleOnly({ role, children }) {
   const { user } = useSession()
@@ -35,27 +36,37 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ToastProvider>
       <BrowserRouter>
-        <SessionProvider>
-          <Routes>
-            <Route element={<AppShell />}>
-              <Route index element={<Home />} />
-              <Route path="my-work" element={<MyWork />} />
-              <Route path="inbox" element={<Inbox />} />
-              <Route path="boards" element={<Boards />} />
-              <Route path="boards/:id" element={<Board />} />
-              <Route path="meetings" element={<Meetings />} />
-              <Route path="meetings/:id" element={<Meeting />} />
-              <Route path="vault" element={<Vault />} />
-              <Route path="team" element={<Team />} />
-              <Route path="activity" element={<RoleOnly role="admin"><Activity /></RoleOnly>} />
-              <Route path="season" element={<Season />} />
-              <Route path="workload" element={<RoleOnly role="lead"><Workload /></RoleOnly>} />
-              <Route path="attendance" element={<RoleOnly role="lead"><Attendance /></RoleOnly>} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </SessionProvider>
+        <Routes>
+          {/* The shop kiosk has no sign-in: its URL is its credential. */}
+          <Route path="kiosk/:token" element={<Kiosk />} />
+          <Route path="*" element={<SignedIn />} />
+        </Routes>
       </BrowserRouter>
     </ToastProvider>
   </React.StrictMode>,
 )
+
+function SignedIn() {
+  return (
+    <SessionProvider>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<Home />} />
+          <Route path="my-work" element={<MyWork />} />
+          <Route path="inbox" element={<Inbox />} />
+          <Route path="boards" element={<Boards />} />
+          <Route path="boards/:id" element={<Board />} />
+          <Route path="meetings" element={<Meetings />} />
+          <Route path="meetings/:id" element={<Meeting />} />
+          <Route path="vault" element={<Vault />} />
+          <Route path="team" element={<Team />} />
+          <Route path="activity" element={<RoleOnly role="admin"><Activity /></RoleOnly>} />
+          <Route path="season" element={<Season />} />
+          <Route path="workload" element={<RoleOnly role="lead"><Workload /></RoleOnly>} />
+          <Route path="attendance" element={<RoleOnly role="lead"><Attendance /></RoleOnly>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </SessionProvider>
+  )
+}
