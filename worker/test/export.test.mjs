@@ -42,16 +42,14 @@ test('board export: groups in order, subitems under their parent, custom columns
 
 test('backup: mentors only, no secrets, logged', async () => {
   const app = await makeTeam()
-  await app.call('mentor', 'POST', '/api/vault', { name: 'Onshape', username: 'team302', secret: 'hunter2-super-secret', notes: 'backup codes: 1234', min_role: 'lead' })
   app.sql("UPDATE users SET calendar_token_hash = 'deadbeef', clerk_user_id = 'user_123' WHERE id = ?", app.users.alex.id)
   assert.equal((await app.call('lead', 'GET', '/api/admin/backup')).status, 403)
   const res = await app.call('mentor', 'GET', '/api/admin/backup')
   assert.equal(res.status, 200)
   assert.equal(res.data.app, '302-hub')
-  assert.equal(res.data.tables.vault_entries.length, 1)
-  assert.equal(res.data.tables.vault_entries[0].name, 'Onshape')
+  assert.ok(!('vault_entries' in res.data.tables))
   const text = JSON.stringify(res.data)
-  for (const leak of ['hunter2', 'secret_enc', 'totp_enc', 'backup codes', 'deadbeef', 'user_123', 'p256dh', 'calendar_token_hash']) assert.ok(!text.includes(leak), `backup leaks ${leak}`)
+  for (const leak of ['deadbeef', 'user_123', 'p256dh', 'calendar_token_hash']) assert.ok(!text.includes(leak), `backup leaks ${leak}`)
   const log = (await app.call('mentor', 'GET', '/api/activity')).data
   assert.ok(JSON.stringify(log).includes('backup.download'))
 })

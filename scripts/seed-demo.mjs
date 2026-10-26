@@ -1,4 +1,4 @@
-// Fills a LOCAL dev server with a demo team, boards, a meeting and vault entries, through the
+// Fills a LOCAL dev server with a demo team, boards, meetings and events, through the
 // real API. Needs `npm run dev` running with DEV_LOGIN=on and BOOTSTRAP_ADMIN_EMAIL set.
 //   node scripts/seed-demo.mjs [http://localhost:8787]
 // All names, emails and passwords are fake.
@@ -143,11 +143,5 @@ for (const [name, kind, start, len, location] of [
   ['Library STEM night', 'outreach', 9, 0, 'Orion Township Public Library'],
 ]) await call(lead, 'POST', '/events', { name, kind, starts_on: day(start), ends_on: day(start + len), location })
 
-for (const [name, url, username, secret, min_role, totp, notes] of [
-  ['Onshape team account', 'https://cad.onshape.com', 'cad@example.org', 'demo-Onsh4pe!', 'lead', 'JBSWY3DPEHPK3PXP', ''],
-  ['Shop Wi-Fi', '', 'Dragons302', 'demo-wifi-pass', 'member', null, 'SSID is Dragons302-5G in the shop.'],
-  ['FIRST team dashboard', 'https://frc-events.firstinspires.org', 'coach@example.org', 'demo-first-pw', 'admin', null, 'Registration, payments, consent forms.'],
-  ['Team Instagram', 'https://instagram.com', 'firstteam302', 'demo-insta-pw', 'lead', null, 'Outreach leads post; mentors approve.'],
-]) await call(admin, 'POST', '/vault', { name, url, username, secret, min_role, totp: totp || undefined, notes })
 
 console.log(`Seeded. Sign in as ${bootstrap} (mentor), jordan@example.org (lead) or marcus@example.org (member).`)

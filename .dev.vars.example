@@ -3,13 +3,12 @@ ENVIRONMENT=development
 DEV_LOGIN=on
 JWT_SECRET=change-me-to-at-least-32-random-characters
 BOOTSTRAP_ADMIN_EMAIL=mentor@example.org
-VAULT_KEY=
 # Web Push (optional locally; npm run dev fills these in automatically if missing)
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 # The Blue Alliance (optional): a free read key from https://www.thebluealliance.com/account
 # turns on Season → Import from TBA and live rank / next match on Home during competitions.
 TBA_API_KEY=
-# Where the team's passwords live (your Bitwarden organization). Leave empty to keep using the
-# hub's built-in vault; set it to switch the vault to read-only for mentors (README → Passwords).
+# Where the team's passwords live: your Vaultwarden (or Bitwarden) web vault, https only.
+# The Passwords page links there (README → Passwords).
 PASSWORDS_URL=

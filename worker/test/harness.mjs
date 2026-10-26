@@ -3,7 +3,6 @@
 // under test; only the D1 binding is stood in for.
 import { DatabaseSync } from 'node:sqlite'
 import { readdirSync, readFileSync } from 'node:fs'
-import { randomBytes } from 'node:crypto'
 import { handle } from '../src/index.js'
 import { signDevToken } from '../src/lib/auth.js'
 
@@ -38,7 +37,6 @@ class D1 {
   }
 }
 
-export const vaultKey = () => randomBytes(32).toString('base64')
 
 // In-memory stand-in for an R2 bucket binding (the calls the worker makes).
 export class FakeR2 {
@@ -57,7 +55,6 @@ export async function makeApp(envOverrides = {}) {
     ENVIRONMENT: 'development',
     DEV_LOGIN: 'on',
     JWT_SECRET: 'x'.repeat(40),
-    VAULT_KEY: vaultKey(),
     FILES: new FakeR2(),
     ...envOverrides,
   }

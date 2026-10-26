@@ -1,6 +1,6 @@
 # 302 Hub
 
-Task boards, meetings and a shared credential vault for **FRC Team 302, Lake Orion Robotics (The Dragons)**.
+Task boards, meetings, attendance, expenses and equipment for **FRC Team 302, Lake Orion Robotics (The Dragons)**.
 Boards work like Monday.com. The app is built on ProjectPro's stack (Cloudflare Workers + D1 + React/Tailwind) and its
 component library (app shell, top bar, modals, toasts, stat cards, charts), in the team's dragon green and flame red.
 
@@ -116,20 +116,17 @@ can copy last week's. *Run:* one topic at a time with a countdown that turns red
 attendance, decisions, and action items that are created as real tasks on a board. Members check themselves in.
 *Recap:* a Markdown summary to paste into Slack, Discord or email, or print.
 
-**Vault.** Shared team logins (Onshape, the FIRST dashboard, social accounts, shop Wi-Fi). Each entry is visible to
-everyone, leads and mentors, or mentors only, and can be limited to one or more subteams (Onshape: Mechanical + CAD;
-the CI login: Programming). Mentors see every subteam's entries. Passwords are revealed one at a time, hide after 20 seconds, and are cleared
-from the clipboard after 30. **Every reveal is logged with name, time and IP.** An entry can hold a 2FA key: the server
-hands out the 6-digit code, never the key. A generator makes strong passwords, and new passwords are checked against
-known data breaches (Have I Been Pwned, k-anonymity: only 5 characters of the password's hash leave the browser).
+**Passwords.** The hub doesn't store passwords. Team logins (Onshape, the FIRST dashboard, social accounts, shop
+Wi-Fi) live in **Vaultwarden**, a free, open-source, self-hosted server for the Bitwarden apps, with a collection per
+subteam. The Passwords page links there and shows how to set up the app. See [Passwords](#passwords-vaultwarden).
 
 **Backup** (mentors). Audit log → Download backup: boards, tasks, values, updates, history, meetings, attendance, events,
-the roster and the audit log as one JSON file. Vault passwords, 2FA keys and notes are **not** in it, nor are push
-subscriptions or calendar links; file attachments are listed but not included. Every download is in the audit log.
+the roster, expenses, equipment and the audit log as one JSON file. Push subscriptions and calendar links are **not**
+in it; file attachments are listed but not included. Every download is in the audit log.
 There is no restore-from-backup button yet; it's a copy for safekeeping and for moving data elsewhere.
 
-**Setup checklist.** Mentors get a short checklist on Home (add people, first board, meetings, events, vault,
-notifications) that ticks itself off.
+**Setup checklist.** Mentors get a short checklist on Home (add people, first board, meetings, events, password
+manager, notifications) that ticks itself off.
 
 ## Roles
 
@@ -144,10 +141,6 @@ notifications) that ticks itself off.
 | See mentor meetings | | | ✓ |
 | Schedule and run meetings | facilitator only | ✓ | ✓ |
 | Self check-in to a live meeting | ✓ | ✓ | ✓ |
-| Vault: see and reveal entries shared with "everyone" | ✓ | ✓ | ✓ |
-| Vault: entries shared with "leads and mentors" | | ✓ | ✓ |
-| Vault: add entries; edit their own | | ✓ | ✓ |
-| Vault: mentor-only entries, delete, access logs | | | ✓ |
 | Add or remove people, change roles, subteams | | | ✓ |
 | Equipment: see everything; borrow and return for yourself | ✓ | ✓ | ✓ |
 | Equipment: add, edit, delete; lend to anyone; record any return; export | | ✓ | ✓ |
@@ -158,21 +151,11 @@ Roles are re-read from the database on **every request**, so removing someone or
 
 ## Security model, stated plainly
 
-### The vault
-- Secrets are encrypted with AES-256-GCM using a key held as a Worker secret (`VAULT_KEY`). Each ciphertext is bound to its
-  entry and field, so a blob copied to another row fails to decrypt (tested).
-- **What this protects against:** a leaked D1 export or backup, or someone with read-only database access.
-- **What it does NOT protect against:** anyone who controls the Cloudflare account or can deploy code. The Worker holds the
-  key and decrypts on request. This is **not** end-to-end or zero-knowledge encryption the way 1Password or Bitwarden are.
-  I chose that trade-off deliberately: no master password for students to forget, and the access log is enforced by the
-  server. If your threat model includes a compromised Cloudflare account, use Bitwarden or 1Password Teams for the
-  highest-value logins (bank, FIRST registration) and keep this for day-to-day logins.
-- Reveals are limited to 30 per person per hour. The limiter is approximate under concurrent requests, so it bounds
-  scraping but is not an exact quota.
-- The access log records that someone *revealed* a secret. It cannot know what they did with it afterwards. **When someone
-  leaves the team, rotate what they revealed.** The access log on each entry shows exactly what that was.
-- Key rotation: set `VAULT_KEY_PREVIOUS` to the old key and `VAULT_KEY` to the new one, then call `POST /api/vault/rekey`
-  as a mentor. Once it reports 0 failed, delete `VAULT_KEY_PREVIOUS`.
+### Passwords
+The hub has no password vault. An earlier version had one, encrypted with a key the server held, so anyone who
+controlled the Cloudflare account could have read every secret. That isn't good enough for the team's real logins, so
+it was removed in favour of Vaultwarden, where passwords are encrypted on each person's device with their own master
+password. The tables were dropped (migration 0013); past "revealed a password" lines stay in the audit log.
 
 ### Sign-in
 - Production uses **Clerk**. The session token is verified inside the Worker: RS256 is pinned, the issuer is derived from the
@@ -189,9 +172,6 @@ Most users are under 18, so the app stores **name and email only**: no phone num
 Members can't see other people's emails. If your district has a data-privacy agreement process, run this through it.
 
 ### Other limits you should know about
-- **Vault notes are not secret.** The password and 2FA key are encrypted and every reveal is logged; the Notes field
-  is stored as plain text and shown to everyone who can see the entry, with no log. The form says so. Don't put
-  passwords, recovery codes or PINs in notes.
 - **No storage quota for attachments.** Each file is capped at 15 MB, but there's no per-person or team total yet;
   watch the R2 bucket's size in the Cloudflare dashboard.
 - **Equipment is an honour system.** The app records what people say they took and brought back; it can't see the
@@ -213,27 +193,19 @@ Members can't see other people's emails. If your district has a data-privacy agr
   background; needs Pillow). The head crop is set for the current artwork, so check the output if the artwork changes.
   The brand colours are in `frontend/tailwind.config.js` (`ACCENT`, `FLAME`).
 
-## Passwords: use Bitwarden
+## Passwords: Vaultwarden
 
-The hub's own vault works, but it isn't the right place for the team's real passwords: the server holds the key and
-decrypts on request, it has had no independent security audit, and there's no browser autofill. A dedicated,
-open-source, audited password manager does this properly. Recommended: **Bitwarden**, hosted by Bitwarden (nothing for
-the team to run or patch; it encrypts on each person's device). Self-hosting **Vaultwarden** also works, but it needs
-its own server with storage. It can't run on Cloudflare Workers, and someone has to keep it updated and backed up.
+Team passwords live in **Vaultwarden**: free, open source, works with the official Bitwarden apps and browser
+extensions (autofill included), and encrypts on each person's device so the server can't read anything. Organizations
+and collections are free, so each subteam gets its own collection.
 
-Moving over:
-1. Create a Bitwarden organization for the team. Make a **group** per subteam (plus Leads and Mentors) and invite people.
-2. In the hub, as a mentor: **Passwords → Export for Bitwarden**. The file has every password in plain text; the
-   download is logged.
-3. Bitwarden Admin Console → **Import data** → format **Bitwarden (json)**. Each entry lands in collections named
-   after its subteams and role (e.g. *Mechanical*, *Programming (leads)*, *Everyone*, *Leads*, *Mentors*). Give each
-   collection to the matching group, and check a few logins.
-4. Set `PASSWORDS_URL` in `wrangler.toml` to the organization's vault link and deploy. Everyone except mentors now sees
-   "Passwords are in Bitwarden" with that link; the hub vault becomes read-only and mentor-only.
-5. Once the import is checked: **Delete everything here** on the same page (type DELETE ALL), then delete the export
-   file and empty the computer's trash. The audit log of who opened what is kept.
-6. Change the passwords that matter most (FIRST dashboard, social accounts) after the move. Anyone who could reveal
-   them in the hub may still have them.
+It can't run on Cloudflare Workers (it needs a server with storage), so it runs on any always-on computer: an old PC or
+a Raspberry Pi at school or a mentor's house, or a free cloud VM. A free **Cloudflare Tunnel** puts it online at a
+subdomain like `vault.team302.org` with HTTPS and no open ports. Everything is in [`deploy/vaultwarden/`](deploy/vaultwarden/):
+a pinned Docker Compose setup, a backup script and step-by-step instructions (about 30 minutes).
+
+Once it's running, set `PASSWORDS_URL` in `wrangler.toml` to its address and deploy; the hub's Passwords page links to
+it. The honest cost: it's a server the team now runs. One mentor has to own monthly updates and backups.
 
 ## Local development
 
@@ -243,12 +215,12 @@ Requires Node 22.13+.
 npm install && npm install --prefix frontend
 npm run db:migrate:local
 npm run dev                         # worker on :8787, app on http://localhost:5173
-node scripts/seed-demo.mjs          # optional, in a second terminal: fake team, boards, meetings, vault
+node scripts/seed-demo.mjs          # optional, in a second terminal: fake team, boards, meetings, events
 npm test                            # integration tests, real SQLite, no mocks of app code
 ```
 
 `npm run dev` first runs `scripts/setup-dev.mjs`. That creates `.dev.vars` with random secrets (a placeholder
-`JWT_SECRET` or empty `VAULT_KEY` copied from the example gets filled in), and creates `frontend/dist`, which
+`JWT_SECRET` copied from the example gets filled in), and creates `frontend/dist`, which
 `wrangler dev` needs before its first build. The first mentor is `mentor@example.org`; to use another address, set
 `BOOTSTRAP_ADMIN_EMAIL` in `.dev.vars` before seeding.
 
@@ -278,14 +250,12 @@ before it starts; to do it by hand, run `npm run db:migrate:local`.
    npx wrangler secret put CLERK_PUBLISHABLE_KEY
    npx wrangler secret put CLERK_JWT_KEY          # Clerk → API keys → JWT public key (PEM)
    npx wrangler secret put BOOTSTRAP_ADMIN_EMAIL  # the head mentor
-   npx wrangler secret put VAULT_KEY              # base64 of 32 random bytes; back it up offline
    npm run vapid                                  # prints a Web Push key pair, then:
    npx wrangler secret put VAPID_PUBLIC_KEY
    npx wrangler secret put VAPID_PRIVATE_KEY
    npx wrangler secret put VAPID_SUBJECT          # mailto:you@team302.org (push services' contact)
    npx wrangler secret put TBA_API_KEY            # optional: thebluealliance.com/account → Read API key
    ```
-   **Back up `VAULT_KEY` somewhere outside Cloudflare.** If it's lost, every stored password is unrecoverable.
 5. `npm run deploy` runs the tests, builds the app, migrates D1 and deploys.
 6. Sign in as the bootstrap mentor, then add everyone in **Team**. Each person signs in with Clerk using the email you entered.
 
@@ -308,12 +278,12 @@ Everything else is purpose-built. The result is a codebase a student programmer 
 migrations/                     0001 core schema; 0002 columns, values, subitems, history, notifications, automations
 worker/src/index.js             router, error handling, security headers, hourly due-date reminders
 worker/src/lib/items.js         every task change goes through here: history, notifications, automations
-worker/src/lib/                 auth (Clerk + dev), column validation, vault crypto, TOTP, audit + rate limit
-worker/src/routes/              boards, items, meetings, vault, team, home, auth
+worker/src/lib/                 auth (Clerk + dev), column validation, audit + rate limit, reminders, TBA, CSV
+worker/src/routes/              boards, items, meetings, kiosk, expenses, equipment, team, home, auth
 worker/test/                    integration tests (node:test + a node:sqlite D1 shim)
 frontend/src/components/board/  the board: table, cells, columns, views, task panel, controls, useBoard
 frontend/src/components/ui/     ProjectPro's component library (modals, stat cards, charts, avatars, …)
 frontend/src/components/layout/ app shell, sidebar, top bar
-frontend/src/pages/             Home, My work, Inbox, Boards, Board, Meetings, Meeting, Vault, People, Audit log
+frontend/src/pages/             Home, My work, Inbox, Boards, Board, Meetings, Meeting, Passwords, Expenses, Equipment, People, Audit log
 scripts/seed-demo.mjs           demo data for local dev only
 ```

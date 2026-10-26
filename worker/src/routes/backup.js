@@ -1,10 +1,9 @@
 // A mentor's full backup as JSON: every board, task, meeting and event, for an off-site copy at
-// the end of a season or before a risky change. Tables are an allowlist; users, attachments and
-// vault_entries also list their columns, so a column added to those later stays out until someone
-// decides it belongs. Tables marked '*' take every column, new ones included. Never included: vault passwords,
-// 2FA keys and notes (they're encrypted with a key the backup doesn't have, and notes are where
-// people paste secrets), push subscriptions, calendar link hashes, sign-in ids, notifications
-// and rate limits. Attached files are listed, not included.
+// the end of a season or before a risky change. Tables are an allowlist; users and attachments
+// also list their columns, so a column added to those later stays out until someone decides it
+// belongs. Tables marked '*' take every column, new ones included. Never included: push
+// subscriptions, calendar link hashes, sign-in ids, notifications and rate limits. Attached files
+// and receipts are listed, not included.
 import { logActivity, rateLimit } from '../lib/activity.js'
 import { requireRole } from '../lib/auth.js'
 import { HttpError } from '../lib/http.js'
@@ -29,8 +28,6 @@ const TABLES = {
   equipment_loans: '*',
   budget_categories: '*',
   expenses: 'id, season, category_id, description, vendor, amount_cents, spent_on, payment, status, submitted_by, decided_by, decided_at, decision_note, reimbursed_by, reimbursed_at, item_id, receipt_filename, created_at, updated_at',
-  vault_entry_subteams: '*',
-  vault_entries: 'id, name, url, username, min_role, owner_id, rotated_at, created_by, created_at, updated_at',
   activity: '*',
 }
 

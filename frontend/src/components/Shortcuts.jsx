@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useSession } from '../context/Session'
 import Modal from './ui/Modal'
 
-const GO = { h: ['/', 'Home'], w: ['/my-work', 'My work'], i: ['/inbox', 'Inbox'], b: ['/boards', 'Boards'], m: ['/meetings', 'Meetings'], s: ['/season', 'Season'], v: ['/vault', 'Vault'], p: ['/team', 'People'] }
+const GO = { h: ['/', 'Home'], w: ['/my-work', 'My work'], i: ['/inbox', 'Inbox'], b: ['/boards', 'Boards'], m: ['/meetings', 'Meetings'], s: ['/season', 'Season'], v: ['/passwords', 'Passwords'], p: ['/team', 'People'] }
 
 const typing = (el) => el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
 

@@ -12,7 +12,7 @@ import Boards from './pages/Boards'
 import Board from './pages/Board'
 import Meetings from './pages/Meetings'
 import Meeting from './pages/Meeting'
-import Vault from './pages/Vault'
+import Passwords from './pages/Passwords'
 import Team from './pages/Team'
 import Activity from './pages/Activity'
 import MyWork from './pages/MyWork'
@@ -60,7 +60,8 @@ function SignedIn() {
           <Route path="boards/:id" element={<Board />} />
           <Route path="meetings" element={<Meetings />} />
           <Route path="meetings/:id" element={<Meeting />} />
-          <Route path="vault" element={<Vault />} />
+          <Route path="passwords" element={<Passwords />} />
+          <Route path="vault" element={<Navigate to="/passwords" replace />} />
           <Route path="team" element={<Team />} />
           <Route path="activity" element={<RoleOnly role="admin"><Activity /></RoleOnly>} />
           <Route path="season" element={<Season />} />

@@ -1,0 +1,5 @@
+data/
+backups/
+.env
+smtp.env
+backup.log

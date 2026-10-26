@@ -1,0 +1,44 @@
+# Team 302's password manager: Vaultwarden (an open-source server for the Bitwarden apps), reached
+# from the internet through a Cloudflare Tunnel, so the machine running it needs no open ports
+# and no public IP. See README.md in this folder.
+#
+#   cp .env.example .env    # then fill it in
+#   docker compose up -d
+services:
+  vaultwarden:
+    # Pinned on purpose: update by changing this tag after reading the release notes
+    # (https://github.com/dani-garcia/vaultwarden/releases), then `docker compose up -d`.
+    image: vaultwarden/server:1.37.4
+    container_name: vaultwarden
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      # Nobody can create an account by themselves; a mentor invites people.
+      SIGNUPS_ALLOWED: "false"
+      INVITATIONS_ALLOWED: "true"
+      # Only admins (mentors) can create organizations.
+      ORG_CREATION_USERS: ${ADMIN_EMAILS}
+      ADMIN_TOKEN: ${ADMIN_TOKEN}
+      # Show the real visitor IP in logs (the tunnel forwards it in this header).
+      IP_HEADER: CF-Connecting-IP
+      LOG_LEVEL: warn
+    # Email for invites and "new device" notices: optional, in its own file (smtp.env.example).
+    # Without it, invited people register at DOMAIN with the invited address (see README).
+    env_file:
+      - path: smtp.env
+        required: false
+    volumes:
+      - ./data:/data
+    # Not published on the host: only the tunnel container talks to it.
+    expose:
+      - "80"
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.0
+    container_name: vaultwarden-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - vaultwarden

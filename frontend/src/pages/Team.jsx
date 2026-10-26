@@ -27,7 +27,7 @@ function PersonForm({ person, subteams, onClose, onSaved }) {
     if (res) onSaved()
   }
   const toggleActive = async () => {
-    if (person.is_active && !(await confirm({ title: `Remove ${person.name}?`, message: 'They lose access on their next click. Tasks they own stay assigned to them, so reassign those. Rotate any shared passwords they revealed (see each vault entry’s access log).', confirmLabel: 'Remove', tone: 'danger' }))) return
+    if (person.is_active && !(await confirm({ title: `Remove ${person.name}?`, message: 'They lose access on their next click. Tasks they own stay assigned to them, so reassign those. Remove them from the team password manager too, and change any shared passwords they knew.', confirmLabel: 'Remove', tone: 'danger' }))) return
     if (await run(() => patch(`/users/${person.id}`, { is_active: !person.is_active }), person.is_active ? `${person.name} removed` : `${person.name} reactivated`)) onSaved()
   }
   return (

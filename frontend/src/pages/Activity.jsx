@@ -8,7 +8,7 @@ import FilterChips from '../components/ui/FilterChips'
 import PageHeader from '../components/ui/PageHeader'
 import { SkeletonTable } from '../components/ui/Skeleton'
 
-const FILTERS = [{ key: '', label: 'All' }, { key: 'vault', label: 'Vault' }, { key: 'user', label: 'People' }, { key: 'board', label: 'Boards' }, { key: 'item', label: 'Tasks' }, { key: 'meeting', label: 'Meetings' }, { key: 'team', label: 'Backups' }]
+const FILTERS = [{ key: '', label: 'All' }, { key: 'user', label: 'People' }, { key: 'board', label: 'Boards' }, { key: 'item', label: 'Tasks' }, { key: 'meeting', label: 'Meetings' }, { key: 'team', label: 'Backups' }]
 
 export default function Activity() {
   const [entity, setEntity] = useState('')
@@ -29,7 +29,7 @@ export default function Activity() {
     <div>
       <PageHeader title="Audit log" subtitle="Password reveals, roster changes, deletions and automations. Visible to mentors only."
         actions={
-          <button type="button" className="btn-secondary" disabled={busy} title="Boards, tasks, meetings, attendance, events and this log as JSON. Vault passwords, 2FA keys and notes are not included."
+          <button type="button" className="btn-secondary" disabled={busy} title="Boards, tasks, meetings, attendance, events and this log as JSON. No passwords: those live in the team password manager."
             onClick={async () => { setBusy(true); try { await downloadFile('/api/admin/backup', 'backup.json') } catch (e) { error('Couldn’t download the backup', e.message) } finally { setBusy(false) } }}>
             <Download className="w-4 h-4" />{busy ? 'Preparing…' : 'Download backup'}
           </button>

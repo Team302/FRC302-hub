@@ -66,7 +66,7 @@ export function email(value, field = 'Email') {
   return cleaned
 }
 
-// Only http(s) links: a javascript: URL saved in the vault would run when someone clicks it.
+// Only http(s) links: a javascript: URL saved in a task or event would run when someone clicks it.
 export function url(value, field) {
   const cleaned = text(value, field, { max: 500 })
   if (!cleaned) return cleaned

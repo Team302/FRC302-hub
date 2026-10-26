@@ -139,9 +139,6 @@ export function teamRoutes(router, authed) {
 
   router.delete('/api/subteams/:id', authed(async (request, env, user) => {
     requireRole(user, 'admin')
-    // Deleting a subteam that limits vault entries would open those entries to everyone.
-    const guarded = await env.DB.prepare('SELECT COUNT(*) AS n FROM vault_entry_subteams WHERE subteam_id = ?').bind(request.params.id).first()
-    if (guarded.n) throw conflict(`${guarded.n} vault ${guarded.n === 1 ? 'entry is' : 'entries are'} limited to this subteam. Change ${guarded.n === 1 ? 'it' : 'them'} in the vault first.`, 'subteam_in_vault')
     const res = await env.DB.prepare('DELETE FROM subteams WHERE id = ?').bind(request.params.id).run()
     if (!res.meta?.changes) throw notFound('That subteam')
     return json({ ok: true })

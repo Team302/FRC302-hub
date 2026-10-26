@@ -5,7 +5,7 @@
 //
 // The kiosk URL (/kiosk/<token>) is the credential; only SHA-256(token) is stored. With it you can
 // see first names + last initials and the live meeting's title, and record check-ins. Nothing
-// else: no tasks, no vault, no emails. Leadership and mentor meetings never appear on a kiosk.
+// else: no tasks, no expenses, no emails. Leadership and mentor meetings never appear on a kiosk.
 // Leads create kiosks (they expire, default 120 days) and revoke them.
 import { logActivity, rateLimit } from '../lib/activity.js'
 import { requireRole } from '../lib/auth.js'

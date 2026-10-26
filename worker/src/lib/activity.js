@@ -1,6 +1,6 @@
 import { clientIp } from './http.js'
 
-// Appends one audit row. Awaited, not fire-and-forget: for vault reveals the audit IS the
+// Appends one audit row. Awaited, not fire-and-forget: for sensitive actions the audit IS the
 // control, so a reveal whose audit row could not be written must fail rather than succeed quietly.
 export async function logActivity(env, request, user, { action, entity, entityId = null, summary = '' }) {
   await env.DB.prepare('INSERT INTO activity (actor_id, action, entity, entity_id, summary, ip) VALUES (?, ?, ?, ?, ?, ?)')

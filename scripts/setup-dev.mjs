@@ -1,8 +1,8 @@
 // Prepares a fresh clone for `npm run dev`. Runs automatically before it (npm "predev").
 //   - frontend/dist must exist or `wrangler dev` refuses to start (wrangler.toml [assets]).
 //   - .dev.vars is created with random secrets if missing, so nobody runs on a placeholder key.
-//   - an existing .dev.vars keeps its values, except a placeholder JWT_SECRET or an empty
-//     VAULT_KEY (as copied from .dev.vars.example), which are replaced with random ones.
+//   - an existing .dev.vars keeps its values, except a placeholder JWT_SECRET (as copied from
+//     .dev.vars.example), which is replaced with a random one.
 //   - the local database gets any migrations it hasn't had yet, so pulling new code and running
 //     `npm run dev` just works (otherwise every page fails with "no such table").
 import { spawnSync } from 'node:child_process'
@@ -27,7 +27,6 @@ if (!existsSync('.dev.vars')) {
     'DEV_LOGIN=on',
     `JWT_SECRET=${randomBytes(32).toString('hex')}`,
     `BOOTSTRAP_ADMIN_EMAIL=${email}`,
-    `VAULT_KEY=${randomBytes(32).toString('base64')}`,
     ...vapidLines(),
     '',
   ].join('\n'))
@@ -38,10 +37,6 @@ if (!existsSync('.dev.vars')) {
   if (/^JWT_SECRET=(change-me.*)?\s*$/m.test(text)) {
     text = text.replace(/^JWT_SECRET=.*$/m, `JWT_SECRET=${randomBytes(32).toString('hex')}`)
     fixed.push('JWT_SECRET')
-  }
-  if (/^VAULT_KEY=\s*$/m.test(text)) {
-    text = text.replace(/^VAULT_KEY=.*$/m, `VAULT_KEY=${randomBytes(32).toString('base64')}`)
-    fixed.push('VAULT_KEY')
   }
   if (!/^VAPID_PUBLIC_KEY=\S/m.test(text)) {
     text = `${text.replace(/^VAPID_(PUBLIC|PRIVATE)_KEY=.*\n?/gm, '').replace(/\n*$/, '\n')}${vapidLines().join('\n')}\n`

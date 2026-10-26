@@ -19,10 +19,10 @@ import { homeRoutes } from './routes/home.js'
 import { itemRoutes } from './routes/items.js'
 import { kioskRoutes } from './routes/kiosk.js'
 import { meetingRoutes } from './routes/meetings.js'
+import { passwordRoutes } from './routes/passwords.js'
 import { pushRoutes } from './routes/push.js'
 import { reportRoutes } from './routes/reports.js'
 import { teamRoutes } from './routes/team.js'
-import { vaultRoutes } from './routes/vault.js'
 
 const SECURITY_HEADERS = {
   'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
@@ -41,7 +41,7 @@ export function buildRouter() {
   boardRoutes(router, authed)
   itemRoutes(router, authed)
   meetingRoutes(router, authed)
-  vaultRoutes(router, authed)
+  passwordRoutes(router, authed)
   homeRoutes(router, authed)
   calendarRoutes(router, authed)
   reportRoutes(router, authed)
@@ -77,7 +77,7 @@ export async function handle(request, env, ctx) {
     return withHeaders(response || Response.json({ error: 'No such API route.' }, { status: 404 }))
   } catch (e) {
     if (e instanceof HttpError) return withHeaders(Response.json({ error: e.message, code: e.code }, { status: e.status }))
-    // Never echo internal error text: it can carry SQL or, in the vault, worse.
+    // Never echo internal error text: it can carry SQL.
     console.error('[api]', request.method, pathname, e?.stack || e)
     return withHeaders(Response.json({ error: 'Something went wrong on the server.' }, { status: 500 }))
   }

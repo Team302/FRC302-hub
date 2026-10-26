@@ -33,9 +33,9 @@ export const PRIORITIES = [
 export const PRIORITY = Object.fromEntries(PRIORITIES.map((p) => [p.id, p]))
 
 export const ROLES = [
-  { id: 'admin', label: 'Mentor', hint: 'Manages people, the vault and every setting' },
-  { id: 'lead', label: 'Lead', hint: 'Runs meetings, creates boards, adds vault entries' },
-  { id: 'member', label: 'Member', hint: 'Works tasks, checks in, sees vault entries shared with everyone' },
+  { id: 'admin', label: 'Mentor', hint: 'Manages people, money and every setting' },
+  { id: 'lead', label: 'Lead', hint: 'Runs meetings, creates boards, manages equipment' },
+  { id: 'member', label: 'Member', hint: 'Works tasks, checks in, submits expenses' },
 ]
 export const ROLE = Object.fromEntries(ROLES.map((r) => [r.id, r]))
 export const RANK = { member: 1, lead: 2, admin: 3 }
@@ -81,11 +81,6 @@ export const TEXT = {
   indigo: 'text-indigo-600', violet: 'text-violet-600', pink: 'text-pink-600',
 }
 
-export const VAULT_ACCESS = [
-  { id: 'member', label: 'Everyone' },
-  { id: 'lead', label: 'Leads and mentors' },
-  { id: 'admin', label: 'Mentors only' },
-]
 
 export const COLUMN_TYPES = [
   { id: 'status', label: 'Status', hint: 'Labels you define' },
