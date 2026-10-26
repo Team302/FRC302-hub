@@ -23,12 +23,28 @@ function seasonStart(now = new Date()) {
   return `${year}-08-01`
 }
 
+const at = (sqlTime) => Date.parse(`${sqlTime.replace(' ', 'T')}Z`)
+
+// The meeting's real length when it was run in the app (at least 15 minutes, so a meeting
+// clicked through afterwards still counts its scheduled length), else its scheduled length.
+function realSpan(m) {
+  if (!m.started_at || !m.ended_at) return null
+  const ms = at(m.ended_at) - at(m.started_at)
+  return ms >= 15 * 60000 && ms < 24 * 3600 * 1000 ? [at(m.started_at), at(m.ended_at)] : null
+}
 function meetingHours(m) {
-  if (m.started_at && m.ended_at) {
-    const ms = Date.parse(`${m.ended_at.replace(' ', 'T')}Z`) - Date.parse(`${m.started_at.replace(' ', 'T')}Z`)
-    if (ms >= 15 * 60000 && ms < 24 * 3600 * 1000) return ms / 3600000
-  }
-  return m.duration_min / 60
+  const span = realSpan(m)
+  return span ? (span[1] - span[0]) / 3600000 : m.duration_min / 60
+}
+
+// One person's hours at one meeting: from when they checked in (or the start) to when they
+// checked out (or the end). Marks without times, set by the runner, count the whole meeting.
+export function personHours(m, mark) {
+  const span = realSpan(m)
+  if (!span || (!mark.checked_in_at && !mark.checked_out_at)) return meetingHours(m)
+  const start = Math.max(span[0], mark.checked_in_at ? at(mark.checked_in_at) : span[0])
+  const end = Math.min(span[1], mark.checked_out_at ? at(mark.checked_out_at) : span[1])
+  return Math.max(0, end - start) / 3600000
 }
 
 const expectedAt = (person, m) => {
@@ -46,19 +62,20 @@ export async function attendanceReport(env, { from, to, userIds = null }) {
         WHERE status = 'ended' AND substr(starts_at, 1, 10) >= ? AND substr(starts_at, 1, 10) <= ? ORDER BY starts_at`
     ).bind(from, to).all(),
     env.DB.prepare(
-      `SELECT t.meeting_id, t.user_id, t.status FROM attendance t JOIN meetings m ON m.id = t.meeting_id
+      `SELECT t.meeting_id, t.user_id, t.status, t.checked_in_at, t.checked_out_at FROM attendance t JOIN meetings m ON m.id = t.meeting_id
         WHERE m.status = 'ended' AND substr(m.starts_at, 1, 10) >= ? AND substr(m.starts_at, 1, 10) <= ?`
     ).bind(from, to).all(),
   ])
-  const mark = new Map(marks.map((r) => [`${r.meeting_id}|${r.user_id}`, r.status]))
+  const mark = new Map(marks.map((r) => [`${r.meeting_id}|${r.user_id}`, r]))
   const rows = people.map((p) => {
     let expected = 0; let attended = 0; let late = 0; let excused = 0; let hours = 0
     for (const m of meetings) {
-      const status = mark.get(`${m.id}|${p.id}`)
+      const row = mark.get(`${m.id}|${p.id}`)
+      const status = row?.status
       // Someone who came to a meeting they weren't expected at still gets the hours.
       if (!expectedAt(p, m) && status !== 'present' && status !== 'late') continue
       if (expectedAt(p, m)) expected++
-      if (status === 'present' || status === 'late') { attended++; hours += meetingHours(m) }
+      if (status === 'present' || status === 'late') { attended++; hours += personHours(m, row) }
       if (status === 'late') late++
       if (status === 'excused') excused++
     }

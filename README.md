@@ -62,7 +62,9 @@ Google/Apple/Mozilla's push services can't read them.
 **Calendar feed.** Account menu → Calendar feed gives a private link for Google Calendar, Apple Calendar or Outlook:
 team meetings you can see and your tasks with due dates.
 
-**Attendance and hours** (leads and mentors). Hours and attendance rate per person from meetings run in the app,
+**Attendance and hours** (leads and mentors). Hours and attendance rate per person from meetings run in the app
+(from each person's check-in to check-out when they used the kiosk or their phone; the whole meeting when the runner
+marked them),
 for lettering, travel eligibility and grant reports. Filter by date range and subteam; export to CSV. Everyone sees
 their own hours on Home.
 
@@ -81,7 +83,8 @@ who has nothing assigned.
 
 **Shop kiosk** (leads: Meetings → Shop kiosk). A link to open on a tablet by the shop door. While a build session,
 general or subteam meeting is running, students find their name (first name + last initial), tap it, confirm, and
-they're checked in, on time or late. The tablet isn't signed in as anyone: the link can only list names and record
+they're checked in, on time or late. Leaving early, they tap their name again to **check out** (or use "Leaving early? Check
+  out" on the meeting page); coming back, they tap once more. The tablet isn't signed in as anyone: the link can only list names and record
 check-ins, never shows leadership or mentor meetings, and stores nothing on the tablet. Every kiosk check-in is labelled
 with the kiosk it came from on the meeting page, and the person running the meeting can change any of them. Links last
 120 days and can be turned off at any time. The screen stays awake while the kiosk page is open (where the browser

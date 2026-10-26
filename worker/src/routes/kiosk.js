@@ -11,7 +11,7 @@ import { logActivity, rateLimit } from '../lib/activity.js'
 import { requireRole } from '../lib/auth.js'
 import { HttpError, json, newId, notFound, readBody } from '../lib/http.js'
 import * as v from '../lib/validate.js'
-import { LATE_AFTER_MIN } from './meetings.js'
+import { checkOut, LATE_AFTER_MIN } from './meetings.js'
 
 const KIOSK_KINDS = ['general', 'build', 'subteam']
 const CHECKINS_PER_HOUR = 400
@@ -87,7 +87,7 @@ export function kioskRoutes(router, authed) {
     ])
     const ids = meetings.map((m) => m.id)
     const marks = ids.length
-      ? (await env.DB.prepare(`SELECT meeting_id, user_id, status FROM attendance WHERE meeting_id IN (${ids.map(() => '?').join(', ')})`).bind(...ids).all()).results
+      ? (await env.DB.prepare(`SELECT meeting_id, user_id, status, checked_out_at FROM attendance WHERE meeting_id IN (${ids.map(() => '?').join(', ')})`).bind(...ids).all()).results
       : []
     await env.DB.prepare("UPDATE kiosks SET last_used_at = datetime('now') WHERE id = ?").bind(kiosk.id).run()
     return json({
@@ -100,6 +100,7 @@ export function kioskRoutes(router, authed) {
         name: shortName(p.name),
         subteam_id: p.subteam_id,
         checked_in: Object.fromEntries(marks.filter((r) => r.user_id === p.id).map((r) => [r.meeting_id, r.status])),
+        checked_out: Object.fromEntries(marks.filter((r) => r.user_id === p.id && r.checked_out_at).map((r) => [r.meeting_id, true])),
       })),
     })
   })
@@ -117,12 +118,24 @@ export function kioskRoutes(router, authed) {
     const person = await env.DB.prepare("SELECT id FROM users WHERE id = ? AND is_active = 1 AND role <> 'admin'").bind(userId).first()
     if (!person) throw notFound('That person')
     const late = Date.now() > Date.parse(meeting.starts_at) + LATE_AFTER_MIN * 60 * 1000
-    // Never overwrites: a mark the meeting runner set (or an earlier check-in) stays.
+    // Never overwrites a status: a mark the meeting runner set (or an earlier check-in) stays.
+    // Someone who checked out and comes back is simply back (the check-out is cleared).
     await env.DB.prepare(
-      `INSERT INTO attendance (meeting_id, user_id, status, recorded_by, via) VALUES (?, ?, ?, NULL, ?)
-       ON CONFLICT(meeting_id, user_id) DO NOTHING`
+      `INSERT INTO attendance (meeting_id, user_id, status, recorded_by, via, checked_in_at) VALUES (?, ?, ?, NULL, ?, datetime('now'))
+       ON CONFLICT(meeting_id, user_id) DO UPDATE SET checked_out_at = NULL WHERE attendance.status IN ('present', 'late')`
     ).bind(meeting.id, person.id, late ? 'late' : 'present', `kiosk:${kiosk.id}`).run()
     const row = await env.DB.prepare('SELECT status FROM attendance WHERE meeting_id = ? AND user_id = ?').bind(meeting.id, person.id).first()
     return json({ status: row.status })
+  })
+
+  router.post('/api/kiosk/:token/checkout', async (request, env) => {
+    const kiosk = await kioskFor(env, request.params.token)
+    if (!(await rateLimit(env, `kiosk:${kiosk.id}`, CHECKINS_PER_HOUR, 3600))) throw new HttpError(429, 'Too many check-ins from this kiosk. Wait a bit.', 'rate_limited')
+    const body = await readBody(request)
+    const meeting = await env.DB.prepare(
+      `SELECT id, status FROM meetings WHERE id = ? AND kind IN (${KIOSK_KINDS.map(() => '?').join(', ')})`
+    ).bind(v.id(body.meeting_id, 'Meeting', { nullable: false }), ...KIOSK_KINDS).first()
+    if (!meeting) throw notFound('That meeting')
+    return json(await checkOut(env, meeting, v.id(body.user_id, 'Person', { nullable: false })))
   })
 }

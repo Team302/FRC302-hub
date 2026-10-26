@@ -1,7 +1,8 @@
 // The shop kiosk: a tablet by the door where students tap their name to check in to the meeting
-// that's live. No sign-in; the URL is the credential (see worker/src/routes/kiosk.js). It can list
-// names and record check-ins, nothing else. Tapping a name asks once more, so a stray tap doesn't
-// check in the wrong person.
+// that's live, and again to check out when they leave (hours count between the two). No sign-in;
+// the URL is the credential (see worker/src/routes/kiosk.js). It can list names and record
+// check-ins and check-outs, nothing else. Every tap asks once more, so a stray tap doesn't check
+// in (or out) the wrong person.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Check, Maximize, Search } from 'lucide-react'
@@ -63,12 +64,25 @@ export default function Kiosk() {
     return meeting?.subteam_id ? [...list.filter((p) => p.subteam_id === meeting.subteam_id), ...list.filter((p) => p.subteam_id !== meeting.subteam_id)] : list
   }, [data, q, subteam, meeting])
 
-  async function checkIn(person) {
+  // in: present/late and not out. out: checked out. Anything else (excused, absent) isn't tappable.
+  const stateOf = (p) => {
+    const status = p.checked_in[meeting.id]
+    if (status !== 'present' && status !== 'late') return status ? 'other' : 'none'
+    return p.checked_out?.[meeting.id] ? 'out' : 'in'
+  }
+
+  async function confirm(person) {
+    const leaving = stateOf(person) === 'in'
     setBusy(true)
     try {
-      const res = await call(`${token}/checkin`, { meeting_id: meeting.id, user_id: person.id })
-      setData((d) => ({ ...d, people: d.people.map((p) => (p.id === person.id ? { ...p, checked_in: { ...p.checked_in, [meeting.id]: res.status } } : p)) }))
-      setWelcome({ name: person.name.split(' ')[0], late: res.status === 'late' })
+      const res = await call(`${token}/${leaving ? 'checkout' : 'checkin'}`, { meeting_id: meeting.id, user_id: person.id })
+      setData((d) => ({
+        ...d,
+        people: d.people.map((p) => (p.id !== person.id ? p : leaving
+          ? { ...p, checked_out: { ...p.checked_out, [meeting.id]: true } }
+          : { ...p, checked_in: { ...p.checked_in, [meeting.id]: res.status }, checked_out: { ...p.checked_out, [meeting.id]: false } })),
+      }))
+      setWelcome({ name: person.name.split(' ')[0], late: !leaving && res.status === 'late', leaving })
       setQ('')
     } catch (e) {
       setWelcome({ error: e.message })
@@ -87,7 +101,7 @@ export default function Kiosk() {
   }
   if (!data) return <Screen><div className="flex-1 grid place-items-center"><BrandMark size="lg" className="animate-pulse" /></div></Screen>
 
-  const here = meeting ? data.people.filter((p) => p.checked_in[meeting.id] === 'present' || p.checked_in[meeting.id] === 'late').length : 0
+  const here = meeting ? data.people.filter((p) => stateOf(p) === 'in').length : 0
   return (
     <Screen>
       <header className="flex flex-wrap items-center gap-x-6 gap-y-3 px-6 sm:px-10 pt-6 pb-4 border-b border-brand-gray-200">
@@ -130,14 +144,15 @@ export default function Kiosk() {
           <ul className="flex-1 overflow-y-auto px-6 sm:px-10 pb-10 grid gap-3 grid-cols-[repeat(auto-fill,minmax(150px,1fr))] content-start">
             {people.map((p) => {
               const status = p.checked_in[meeting.id]
-              const done = status === 'present' || status === 'late'
+              const state = stateOf(p)
+              const done = state === 'in'
               return (
                 <li key={p.id}>
-                  <button type="button" disabled={done || busy || !!status} onClick={() => setConfirming(p)}
-                    className={`w-full h-full min-h-[120px] rounded-2xl border p-4 flex flex-col items-center justify-center gap-2.5 text-center transition-transform active:scale-[0.97] ${done ? 'border-accent-500/40 bg-accent-500/10' : status ? 'border-brand-gray-200 opacity-50' : 'border-brand-gray-200 bg-white hover:border-accent-500/60'}`}>
+                  <button type="button" disabled={state === 'other' || busy} onClick={() => setConfirming(p)}
+                    className={`w-full h-full min-h-[120px] rounded-2xl border p-4 flex flex-col items-center justify-center gap-2.5 text-center transition-transform active:scale-[0.97] ${done ? 'border-accent-500/40 bg-accent-500/10' : state === 'other' ? 'border-brand-gray-200 opacity-50' : state === 'out' ? 'border-brand-gray-200 bg-white opacity-70' : 'border-brand-gray-200 bg-white hover:border-accent-500/60'}`}>
                     <span className={`w-12 h-12 rounded-full grid place-items-center text-base font-semibold ${done ? 'bg-accent-600 text-white' : 'bg-brand-gray-100 text-brand-gray-600'}`}>{done ? <Check className="w-6 h-6" strokeWidth={3} /> : initials(p.name)}</span>
                     <span className="text-base font-medium leading-tight">{p.name}</span>
-                    {status && <span className="text-xs text-brand-gray-500">{status === 'late' ? 'Here (late)' : status === 'present' ? 'Here' : status === 'excused' ? 'Excused' : 'Marked absent'}</span>}
+                    {status && <span className="text-xs text-brand-gray-500">{state === 'out' ? 'Left · tap if you’re back' : done ? `${status === 'late' ? 'Here (late)' : 'Here'} · tap to leave` : status === 'excused' ? 'Excused' : 'Marked absent'}</span>}
                   </button>
                 </li>
               )
@@ -152,10 +167,10 @@ export default function Kiosk() {
           <div role="dialog" aria-modal="true" aria-label={`Check in ${confirming.name}`} className="w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-pop" onClick={(e) => e.stopPropagation()}>
             <span className="w-20 h-20 mx-auto rounded-full grid place-items-center text-2xl font-semibold bg-brand-gray-100">{initials(confirming.name)}</span>
             <p className="text-2xl font-semibold mt-4">{confirming.name}</p>
-            <p className="text-brand-gray-500 mt-1">Is this you?</p>
+            <p className="text-brand-gray-500 mt-1">{stateOf(confirming) === 'in' ? 'Leaving now?' : stateOf(confirming) === 'out' ? 'Back again?' : 'Is this you?'}</p>
             <div className="grid grid-cols-2 gap-3 mt-6">
               <button type="button" className="btn-secondary h-14 text-base" onClick={() => setConfirming(null)}>No</button>
-              <button type="button" autoFocus className="btn-primary h-14 text-base" disabled={busy} onClick={() => checkIn(confirming)}>Check in</button>
+              <button type="button" autoFocus className="btn-primary h-14 text-base" disabled={busy} onClick={() => confirm(confirming)}>{stateOf(confirming) === 'in' ? 'Check out' : 'Check in'}</button>
             </div>
           </div>
         </div>
@@ -163,7 +178,7 @@ export default function Kiosk() {
       {welcome && (
         <div className="fixed inset-x-0 bottom-8 z-50 flex justify-center px-6 pointer-events-none" role="status" aria-live="polite">
           <div className={`rounded-2xl px-8 py-5 text-xl font-semibold shadow-pop ${welcome.error ? 'bg-status-danger text-white' : 'bg-accent-600 text-white'}`}>
-            {welcome.error || `Welcome, ${welcome.name}!${welcome.late ? ' (marked late)' : ''}`}
+            {welcome.error || (welcome.leaving ? `See you, ${welcome.name}!` : `Welcome, ${welcome.name}!${welcome.late ? ' (marked late)' : ''}`)}
           </div>
         </div>
       )}

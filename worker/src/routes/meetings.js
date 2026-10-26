@@ -14,6 +14,16 @@ const KINDS = ['general', 'subteam', 'leadership', 'build', 'mentor']
 const ATTENDANCE = ['present', 'late', 'excused', 'absent']
 export const LATE_AFTER_MIN = 10
 
+// Check out of a live meeting: only someone checked in (present or late) and not already out.
+export async function checkOut(env, meeting, userId) {
+  if (meeting.status !== 'live') throw conflict('Check-out is only while the meeting is running. Once it ends, everyone still here is counted until the end.')
+  const res = await env.DB.prepare(
+    "UPDATE attendance SET checked_out_at = datetime('now') WHERE meeting_id = ? AND user_id = ? AND status IN ('present', 'late') AND checked_out_at IS NULL"
+  ).bind(meeting.id, userId).run()
+  if (!res.meta.changes) throw conflict('Not checked in, or already checked out.')
+  return { checked_out: true }
+}
+
 const KIND_MIN_ROLE = { leadership: 'lead', mentor: 'admin' }
 const canSee = (user, meeting) => atLeast(user, KIND_MIN_ROLE[meeting.kind] || 'member')
 const canRun = (user, meeting) => atLeast(user, 'lead') || meeting.facilitator_id === user.id
@@ -126,7 +136,7 @@ export function meetingRoutes(router, authed) {
     const [agenda, { results: roster }, { results: actions }] = await Promise.all([
       agendaOf(env, meeting.id),
       env.DB.prepare(
-        `SELECT u.id, u.name, u.subteam_id, t.status, t.recorded_at, t.via,
+        `SELECT u.id, u.name, u.subteam_id, t.status, t.recorded_at, t.via, t.checked_in_at, t.checked_out_at,
                 (SELECT k.name FROM kiosks k WHERE 'kiosk:' || k.id = t.via) AS via_kiosk FROM users u
            LEFT JOIN attendance t ON t.user_id = u.id AND t.meeting_id = ?
           WHERE u.is_active = 1 OR t.status IS NOT NULL ORDER BY u.name COLLATE NOCASE`
@@ -287,7 +297,9 @@ export function meetingRoutes(router, authed) {
     const status = v.oneOf(body.status, 'Attendance', ATTENDANCE, { required: true })
     await env.DB.prepare(
       `INSERT INTO attendance (meeting_id, user_id, status, recorded_by) VALUES (?, ?, ?, ?)
-       ON CONFLICT(meeting_id, user_id) DO UPDATE SET status = excluded.status, recorded_by = excluded.recorded_by, recorded_at = datetime('now'), via = NULL`
+       ON CONFLICT(meeting_id, user_id) DO UPDATE SET status = excluded.status, recorded_by = excluded.recorded_by, recorded_at = datetime('now'), via = NULL,
+         checked_in_at = CASE WHEN excluded.status IN ('present', 'late') THEN attendance.checked_in_at END,
+         checked_out_at = CASE WHEN excluded.status IN ('present', 'late') THEN attendance.checked_out_at END`
     ).bind(meeting.id, target.id, status, user.id).run()
     return json({ ok: true })
   }))
@@ -300,11 +312,17 @@ export function meetingRoutes(router, authed) {
     if (meeting.status !== 'live') throw conflict('Check-in opens when the meeting starts.')
     const late = Date.now() > Date.parse(meeting.starts_at) + LATE_AFTER_MIN * 60 * 1000
     await env.DB.prepare(
-      `INSERT INTO attendance (meeting_id, user_id, status, recorded_by, via) VALUES (?, ?, ?, ?, 'self')
-       ON CONFLICT(meeting_id, user_id) DO NOTHING`
+      `INSERT INTO attendance (meeting_id, user_id, status, recorded_by, via, checked_in_at) VALUES (?, ?, ?, ?, 'self', datetime('now'))
+       ON CONFLICT(meeting_id, user_id) DO UPDATE SET checked_out_at = NULL WHERE attendance.status IN ('present', 'late')`
     ).bind(meeting.id, user.id, late ? 'late' : 'present', user.id).run()
     const row = await env.DB.prepare('SELECT status FROM attendance WHERE meeting_id = ? AND user_id = ?').bind(meeting.id, user.id).first()
     return json({ status: row.status })
+  }))
+
+  // Self check-out: leaving before the meeting ends, so hours stop now.
+  router.post('/api/meetings/:id/checkout', authed(async (request, env, user) => {
+    const meeting = await getMeeting(env, user, request.params.id)
+    return json(await checkOut(env, meeting, user.id))
   }))
 
   // ── Action items → board tasks ──

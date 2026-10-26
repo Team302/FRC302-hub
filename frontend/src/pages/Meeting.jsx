@@ -179,8 +179,11 @@ function Run({ data, setData, users, run, reload }) {
       {confirmDialog}
       <div className="lg:col-span-2 space-y-6">
         <section className={`card p-6 ${active && remaining < 0 ? 'border-red-300' : ''}`}>
-          {live && !me?.status && (
-            <button className="btn-primary w-full mb-5" onClick={async () => { if (await run(() => post(`/meetings/${meeting.id}/checkin`), 'Checked in')) reload() }}><UserCheck className="w-4 h-4" />Check in</button>
+          {live && (!me?.status || me?.checked_out_at) && (
+            <button className="btn-primary w-full mb-5" onClick={async () => { if (await run(() => post(`/meetings/${meeting.id}/checkin`), me?.checked_out_at ? 'Checked back in' : 'Checked in')) reload() }}><UserCheck className="w-4 h-4" />{me?.checked_out_at ? 'I’m back' : 'Check in'}</button>
+          )}
+          {live && (me?.status === 'present' || me?.status === 'late') && !me?.checked_out_at && (
+            <button className="btn-secondary w-full mb-5" onClick={async () => { if (await run(() => post(`/meetings/${meeting.id}/checkout`), 'Checked out. Your hours stop now.')) reload() }}>Leaving early? Check out</button>
           )}
           {active ? (
             <>
@@ -247,7 +250,7 @@ function Run({ data, setData, users, run, reload }) {
       </div>
 
       <div className="space-y-6">
-        <Section title="Attendance" aside={<span className="text-xs text-brand-gray-500 tabular-nums">{counts.present + counts.late} of {attendance.length} here</span>}>
+        <Section title="Attendance" aside={<span className="text-xs text-brand-gray-500 tabular-nums">{counts.present + counts.late} of {attendance.length} came{live ? ` · ${attendance.filter((a) => (a.status === 'present' || a.status === 'late') && !a.checked_out_at).length} here now` : ''}</span>}>
           {canRun && <p className="px-5 pt-3 text-xs text-brand-gray-500">Click a name to cycle present, late, excused, absent. <button className="link" onClick={markRestPresent}>Mark the rest present</button></p>}
           <ul className="p-2 grid gap-0.5 max-h-[26rem] overflow-y-auto">
             {attendance.map((p) => {
@@ -256,8 +259,15 @@ function Run({ data, setData, users, run, reload }) {
                 <li key={p.id}>
                   <button type="button" disabled={!canRun} onClick={() => mark(p)} className="w-full flex items-center gap-2.5 rounded-lg px-3 py-1.5 hover:bg-brand-gray-100 disabled:hover:bg-transparent text-left">
                     <Avatar name={p.name} seed={p.id} size="sm" />
-                    <span className="flex-1 text-sm truncate">{p.name}</span>
-                    {s && p.via && <span className="text-[11px] text-brand-gray-400" title={p.via_kiosk ? `Checked in at the “${p.via_kiosk}” kiosk` : 'Checked in from their own device'}>{p.via_kiosk ? `kiosk · ${p.via_kiosk}` : 'self'}</span>}
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm truncate">{p.name}</span>
+                      {s && (p.checked_in_at || p.via) && (
+                        <span className="block text-[11px] leading-4 text-brand-gray-400 truncate tabular-nums" title={p.via_kiosk ? `Checked in at the “${p.via_kiosk}” kiosk` : p.via ? 'Checked in from their own device' : undefined}>
+                          {p.checked_in_at ? fmtTime(parseServerTime(p.checked_in_at)) : ''}{p.checked_out_at ? ` – ${fmtTime(parseServerTime(p.checked_out_at))} (left)` : ''}
+                          {p.via ? `${p.checked_in_at ? ' · ' : ''}${p.via_kiosk ? `kiosk · ${p.via_kiosk}` : 'self'}` : ''}
+                        </span>
+                      )}
+                    </span>
                     {s ? <span style={{ backgroundColor: s.fill, color: s.ink }} className="text-[11px] font-medium rounded-full px-2 py-0.5">{s.label}</span> : <span className="text-[11px] text-brand-gray-400">—</span>}
                   </button>
                 </li>
