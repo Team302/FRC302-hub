@@ -214,6 +214,9 @@ Use it with demo data only. Plain `npm run dev` refuses other devices. For real 
 build time on your machine and none of it ships to the browser. The fix is a Tailwind 4 migration. Don't run
 `npm audit fix --force`: it applies that migration blindly and breaks the styles.
 
+**"no such table" errors** mean the local database is behind the code. `npm run dev` applies pending migrations
+before it starts; to do it by hand, run `npm run db:migrate:local`.
+
 ## Deploying to Cloudflare
 
 1. `npx wrangler d1 create frc302-hub-db` and paste the id into `wrangler.toml`. Then

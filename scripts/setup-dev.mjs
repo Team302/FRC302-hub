@@ -3,6 +3,9 @@
 //   - .dev.vars is created with random secrets if missing, so nobody runs on a placeholder key.
 //   - an existing .dev.vars keeps its values, except a placeholder JWT_SECRET or an empty
 //     VAULT_KEY (as copied from .dev.vars.example), which are replaced with random ones.
+//   - the local database gets any migrations it hasn't had yet, so pulling new code and running
+//     `npm run dev` just works (otherwise every page fails with "no such table").
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomBytes, generateKeyPairSync } from 'node:crypto'
 
@@ -49,3 +52,15 @@ if (!existsSync('.dev.vars')) {
     console.log(`Filled in ${fixed.join(' and ')} in .dev.vars with random values.`)
   }
 }
+
+// Apply pending migrations to the local D1 database. Already-applied ones are skipped by wrangler.
+const migrate = spawnSync('npx', ['wrangler', 'd1', 'migrations', 'apply', 'frc302-hub-db', '--local'], {
+  stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32', env: { ...process.env, CI: '1' }, encoding: 'utf8',
+})
+if (migrate.status !== 0) {
+  console.error(`${migrate.stdout || ''}${migrate.stderr || ''}`)
+  console.error('\nCouldn’t update the local database (see above). Fix that, or run `npm run db:migrate:local` to see the error on its own.')
+  process.exit(1)
+}
+const applied = [...new Set([...(migrate.stdout || '').matchAll(/(\d{4}_[\w-]+\.sql)\s*│\s*✅/g)].map((m) => m[1]))]
+console.log(applied.length ? `Local database updated: ${applied.join(', ')}` : 'Local database is up to date.')
