@@ -131,7 +131,8 @@ export function sortItems(items, sort, values, statuses) {
 }
 
 // Bottom bar that appears with a selection, Monday-style.
-export function BulkBar({ count, groups, statuses, users, onStatus, onOwner, onMove, onDuplicate, onDelete, onClear }) {
+// lockDone: reason string when some selected task can't be marked Done by this person.
+export function BulkBar({ count, groups, statuses, users, lockDone = null, onStatus, onOwner, onMove, onDuplicate, onDelete, onClear }) {
   const btn = 'flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-brand-gray-600 hover:bg-brand-gray-100 hover:text-brand-black'
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 glass-strong border rounded-2xl shadow-pop flex items-center gap-1 pl-1 pr-2 py-1.5 animate-fade-up" role="toolbar" aria-label="Selected tasks">
@@ -140,7 +141,15 @@ export function BulkBar({ count, groups, statuses, users, onStatus, onOwner, onM
         <span className="text-sm font-medium">{count === 1 ? 'Task' : 'Tasks'} selected</span>
       </span>
       <Popover align="center" trigger={({ toggle, ref }) => <button ref={ref} type="button" onClick={toggle} className={btn}><span className="w-4 h-4 rounded bg-[#037f4c]" />Status</button>}>
-        {(close) => <div className="p-2 grid gap-1.5 w-48">{statuses.map((s) => <button key={s.id} type="button" className="h-8 rounded-md overflow-hidden" onClick={() => { onStatus(s.id); close() }}><Fill fill={s.fill} ink={s.ink}>{s.label}</Fill></button>)}</div>}
+        {(close) => (
+          <div className="p-2 grid gap-1.5 w-48">
+            {statuses.map((s) => {
+              const locked = s.id === 'done' && lockDone
+              return <button key={s.id} type="button" disabled={!!locked} title={locked || undefined} className="h-8 rounded-md overflow-hidden disabled:opacity-35 disabled:cursor-not-allowed" onClick={() => { onStatus(s.id); close() }}><Fill fill={s.fill} ink={s.ink}>{s.label}</Fill></button>
+            })}
+            {lockDone && <p className="text-[11px] leading-4 text-brand-gray-500 px-0.5">{lockDone}</p>}
+          </div>
+        )}
       </Popover>
       <Popover align="center" trigger={({ toggle, ref }) => <button ref={ref} type="button" onClick={toggle} className={btn}><UserRound className="w-4 h-4" />Owner</button>}>
         {(close) => (

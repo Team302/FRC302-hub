@@ -4,7 +4,7 @@ import { BarChart3, CalendarDays, Columns3, Download, GanttChartSquare, LayoutGr
 import { del, downloadFile } from '../lib/api'
 import { useSession } from '../context/Session'
 import { useToast } from '../context/ToastContext'
-import { atLeast, boardStatuses, SWATCH } from '../lib/constants'
+import { atLeast, boardStatuses, SWATCH, doneLock } from '../lib/constants'
 import { todayIso } from '../lib/format'
 import EmptyState from '../components/ui/EmptyState'
 import SegmentedControl from '../components/ui/SegmentedControl'
@@ -225,6 +225,7 @@ export default function Board() {
 
       {selectedIds.length > 0 && (
         <BulkBar count={selectedIds.length} groups={data.groups} statuses={statuses} users={users}
+          lockDone={selectedIds.map((sid) => data.items.find((i) => i.id === sid)).filter(Boolean).some((i) => doneLock(user, data.board, i)) ? 'Some of these need their reviewer (or a lead) to mark them Done' : null}
           onStatus={(status) => board.bulkUpdate(selectedIds, { status })}
           onOwner={(assignee_id) => board.bulkUpdate(selectedIds, { assignee_id })}
           onMove={(group_id) => board.bulkUpdate(selectedIds, { group_id })}

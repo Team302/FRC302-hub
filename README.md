@@ -40,7 +40,7 @@ Ordered → Received, with vendor, link, quantity, cost totals per group and tra
   review** list on My work (with a count in the sidebar). They **Approve** (Done, with the sign-off recorded) or
   **Request changes** (back to Working on it, with their note posted as an update). Workload shows how many reviews
   each person has waiting. A review that has waited 2 days gets the reviewer a reminder once a day until it's
-  handled.
+  handled; from 4 days, the subteam's leads (or the mentors, if it has none) are told too.
 - **Done needs approval** (per board, in Settings, off by default): only the task's reviewer, a lead or a mentor can
   mark it Done. The server enforces it for table edits, bulk edits, automations and new tasks. The owner can't be their
   own reviewer, and on these boards a member can't make themselves the reviewer of someone else's task. Done is

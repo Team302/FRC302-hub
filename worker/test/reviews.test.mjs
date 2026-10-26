@@ -181,3 +181,22 @@ test('reviews waiting 2+ days get one reminder a day', async () => {
   await app.call('sam', 'POST', `/api/items/${item.id}/approve`)
   assert.equal((await app.call('alex', 'GET', `/api/items/${item.id}`)).data.item.review_requested_at, null)
 })
+
+test('a review waiting 4+ days is escalated to the subteam’s leads, else the mentors', async () => {
+  const { app, u, mk } = await setup({ approval: false })
+  app.sql("UPDATE users SET subteam_id = 'st_mech' WHERE id = ?", u.lead.id)
+  const item = (await mk('alex', { assignee_id: u.alex.id, reviewer_id: u.sam.id, status: 'review' })).data.item
+  app.sql("UPDATE items SET review_requested_at = datetime('now', '-2 days', '-1 hour') WHERE id = ?", item.id)
+  await sendReviewReminders(app.env)
+  assert.ok(!(await inbox(app, 'lead')).some((n) => /days for Sam/.test(n.body)), 'not at 2 days')
+  app.sql('DELETE FROM review_reminder_log')
+  app.sql("UPDATE items SET review_requested_at = datetime('now', '-5 days') WHERE id = ?", item.id)
+  await sendReviewReminders(app.env)
+  assert.ok((await inbox(app, 'lead')).some((n) => /waited 5 days for Sam’s review/.test(n.body)))
+  assert.ok(!(await inbox(app, 'mentor')).some((n) => /for Sam’s review/.test(n.body)), 'the subteam has a lead')
+  // No lead on the subteam: the mentors.
+  app.sql('UPDATE users SET subteam_id = NULL WHERE id = ?', u.lead.id)
+  app.sql('DELETE FROM review_reminder_log')
+  await sendReviewReminders(app.env)
+  assert.ok((await inbox(app, 'mentor')).some((n) => /for Sam’s review/.test(n.body)))
+})
