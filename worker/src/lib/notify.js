@@ -3,9 +3,10 @@
 // been removed from the team are never notified.
 import { pushConfigured, pushToUser } from './webpush.js'
 
-const PUSH_TITLE = { assigned: 'Assigned to you', mentioned: 'You were mentioned', update: 'New update', status: 'Status changed', due: 'Due soon', automation: 'Automation', review: 'Review' }
+const PUSH_TITLE = { assigned: 'Assigned to you', mentioned: 'You were mentioned', update: 'New update', status: 'Status changed', due: 'Due soon', automation: 'Automation', review: 'Review', equipment: 'Equipment' }
 
-export async function notify(env, { userIds, actorId = null, kind, itemId = null, body }) {
+// `url` is where a push opens when the notification isn't about a task (e.g. '/equipment').
+export async function notify(env, { userIds, actorId = null, kind, itemId = null, body, url = null }) {
   const wanted = [...new Set(userIds.filter(Boolean))].filter((id) => id !== actorId)
   if (!wanted.length) return
   const { results: active } = await env.DB.prepare(`SELECT id FROM users WHERE is_active = 1 AND id IN (${wanted.map(() => '?').join(', ')})`).bind(...wanted).all()
@@ -20,7 +21,7 @@ export async function notify(env, { userIds, actorId = null, kind, itemId = null
   // Push is sent after the response when the runtime allows it (env.waitUntil, set per request
   // in index.js), so a slow push service never slows down the person's click.
   const item = itemId ? await env.DB.prepare('SELECT board_id FROM live_items WHERE id = ?').bind(itemId).first() : null
-  const message = { title: PUSH_TITLE[kind] || 'Team 302', body: text, url: item ? `/boards/${item.board_id}?item=${itemId}` : '/inbox', tag: `${kind}:${itemId || ''}` }
+  const message = { title: PUSH_TITLE[kind] || 'Team 302', body: text, url: item ? `/boards/${item.board_id}?item=${itemId}` : url || '/inbox', tag: `${kind}:${itemId || ''}` }
   const delivery = Promise.all(targets.map((uid) => pushToUser(env, uid, message)))
   if (env.waitUntil) env.waitUntil(delivery)
   else await delivery

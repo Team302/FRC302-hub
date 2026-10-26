@@ -12,6 +12,7 @@ import { authRoutes } from './routes/auth.js'
 import { backupRoutes } from './routes/backup.js'
 import { boardRoutes } from './routes/boards.js'
 import { calendarRoutes } from './routes/calendar.js'
+import { equipmentRoutes, sendEquipmentReminders } from './routes/equipment.js'
 import { eventRoutes } from './routes/events.js'
 import { homeRoutes } from './routes/home.js'
 import { itemRoutes } from './routes/items.js'
@@ -48,6 +49,7 @@ export function buildRouter() {
   eventRoutes(router, authed)
   backupRoutes(router, authed)
   kioskRoutes(router, authed)
+  equipmentRoutes(router, authed)
   router.get('/api/health', () => Response.json({ ok: true }))
   router.all('/api/*', () => { throw new HttpError(404, 'No such API route.', 'not_found') })
   return router
@@ -81,11 +83,13 @@ export async function handle(request, env, ctx) {
 
 export default {
   fetch: handle,
-  // Hourly (wrangler.toml [triggers]): due-date and review reminders (once per task per day) and emptying
+  // Hourly (wrangler.toml [triggers]): due-date and review reminders (once per task per day), overdue
+  // equipment reminders (once per loan per day) and emptying
   // trash older than TRASH_DAYS. One failing doesn't stop the other.
   scheduled: (_controller, env, ctx) => ctx.waitUntil(Promise.allSettled([
     sendDueReminders({ ...env, waitUntil: (p) => ctx.waitUntil(p) }),
     sendReviewReminders({ ...env, waitUntil: (p) => ctx.waitUntil(p) }),
+    sendEquipmentReminders({ ...env, waitUntil: (p) => ctx.waitUntil(p) }),
     purgeTrash(env),
   ]).then((rs) => rs.forEach((r) => r.status === 'rejected' && console.error('[cron]', r.reason)))),
 }

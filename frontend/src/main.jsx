@@ -21,6 +21,7 @@ import Attendance from './pages/Attendance'
 import Season from './pages/Season'
 import Workload from './pages/Workload'
 import Kiosk from './pages/Kiosk'
+import Equipment from './pages/Equipment'
 
 function RoleOnly({ role, children }) {
   const { user } = useSession()
@@ -62,6 +63,7 @@ function SignedIn() {
           <Route path="team" element={<Team />} />
           <Route path="activity" element={<RoleOnly role="admin"><Activity /></RoleOnly>} />
           <Route path="season" element={<Season />} />
+          <Route path="equipment" element={<Equipment />} />
           <Route path="workload" element={<RoleOnly role="lead"><Workload /></RoleOnly>} />
           <Route path="attendance" element={<RoleOnly role="lead"><Attendance /></RoleOnly>} />
           <Route path="*" element={<Navigate to="/" replace />} />
