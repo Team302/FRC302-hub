@@ -109,7 +109,8 @@ attendance, decisions, and action items that are created as real tasks on a boar
 *Recap:* a Markdown summary to paste into Slack, Discord or email, or print.
 
 **Vault.** Shared team logins (Onshape, the FIRST dashboard, social accounts, shop Wi-Fi). Each entry is visible to
-everyone, leads and mentors, or mentors only. Passwords are revealed one at a time, hide after 20 seconds, and are cleared
+everyone, leads and mentors, or mentors only, and can be limited to one or more subteams (Onshape: Mechanical + CAD;
+the CI login: Programming). Mentors see every subteam's entries. Passwords are revealed one at a time, hide after 20 seconds, and are cleared
 from the clipboard after 30. **Every reveal is logged with name, time and IP.** An entry can hold a 2FA key: the server
 hands out the 6-digit code, never the key. A generator makes strong passwords, and new passwords are checked against
 known data breaches (Have I Been Pwned, k-anonymity: only 5 characters of the password's hash leave the browser).

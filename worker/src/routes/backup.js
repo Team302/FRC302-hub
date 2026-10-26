@@ -27,6 +27,7 @@ const TABLES = {
   attachments: 'id, item_id, filename, content_type, size, uploaded_by, created_at',
   budget_categories: '*',
   expenses: 'id, season, category_id, description, vendor, amount_cents, spent_on, payment, status, submitted_by, decided_by, decided_at, decision_note, reimbursed_by, reimbursed_at, item_id, receipt_filename, created_at, updated_at',
+  vault_entry_subteams: '*',
   vault_entries: 'id, name, url, username, min_role, owner_id, rotated_at, created_by, created_at, updated_at',
   activity: '*',
 }

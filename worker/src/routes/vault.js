@@ -1,5 +1,6 @@
 // The team credential vault. Rules:
-//   - An entry is invisible (404, not 403) to anyone below its min_role.
+//   - An entry is invisible (404, not 403) to anyone below its min_role, and, when it is limited
+//     to subteams, to anyone not on one of them. Mentors see every subteam's entries.
 //   - Listing never returns a secret. A secret leaves the server only through /reveal or /totp,
 //     one entry at a time, each written to the activity log with who, when and from what IP,
 //     and rate-limited per person so an account can't be used to scrape the vault.
@@ -17,9 +18,19 @@ import { openSecret, sealSecret, vaultAad, vaultConfigured, VaultCryptoError } f
 const ACCESS = ['admin', 'lead', 'member']
 const REVEALS_PER_HOUR = 30
 
+// "st_a,st_b" (GROUP_CONCAT) → ['st_a', 'st_b']
+const idList = (text) => (text ? text.split(',') : [])
+
+// Role first, then subteams. Mentors aren't limited by subteam: they run the vault.
+const canSee = (user, e) => atLeast(user, e.min_role) && (atLeast(user, 'admin') || !e.subteam_ids.length || e.subteam_ids.includes(user.subteam_id))
+
+const SELECT_ENTRY = `SELECT v.*, u.name AS owner_name,
+  (SELECT GROUP_CONCAT(s.subteam_id) FROM vault_entry_subteams s WHERE s.entry_id = v.id) AS subteam_list
+  FROM vault_entries v LEFT JOIN users u ON u.id = v.owner_id`
+
 function present(e, user) {
   return {
-    id: e.id, name: e.name, url: e.url, username: e.username, notes: e.notes, min_role: e.min_role,
+    id: e.id, name: e.name, url: e.url, username: e.username, notes: e.notes, min_role: e.min_role, subteam_ids: e.subteam_ids,
     owner_id: e.owner_id, owner_name: e.owner_name ?? null, has_secret: !!e.secret_enc, has_totp: !!e.totp_enc,
     rotated_at: e.rotated_at, created_at: e.created_at, updated_at: e.updated_at,
     can_edit: canEdit(user, e),
@@ -33,10 +44,35 @@ function requireVault(env) {
 }
 
 async function getEntry(env, user, id) {
-  const e = await env.DB.prepare('SELECT v.*, u.name AS owner_name FROM vault_entries v LEFT JOIN users u ON u.id = v.owner_id WHERE v.id = ?').bind(id).first()
-  if (!e || !atLeast(user, e.min_role)) throw notFound('That vault entry')
+  const row = await env.DB.prepare(`${SELECT_ENTRY} WHERE v.id = ?`).bind(id).first()
+  const e = row && { ...row, subteam_ids: idList(row.subteam_list) }
+  if (!e || !canSee(user, e)) throw notFound('That vault entry')
   return e
 }
+
+// subteam_ids from a request: undefined = leave as is; [] = no limit. Every id must exist. A
+// non-mentor can't limit an entry to subteams they aren't on: they'd lock themselves out.
+async function subteamIds(env, user, raw) {
+  if (raw === undefined) return undefined
+  if (!Array.isArray(raw) || raw.length > 20 || !raw.every((x) => typeof x === 'string')) throw badRequest('Subteams must be a list.')
+  const ids = [...new Set(raw)]
+  if (ids.length) {
+    const { results } = await env.DB.prepare(`SELECT id FROM subteams WHERE id IN (${ids.map(() => '?').join(', ')})`).bind(...ids).all()
+    if (results.length !== ids.length) throw badRequest('One of those subteams doesn’t exist.')
+    if (!atLeast(user, 'admin') && !ids.includes(user.subteam_id)) throw badRequest('Include your own subteam, or you won’t be able to see the entry. A mentor can set any subteams.')
+  }
+  return ids
+}
+
+async function subteamNames(env, ids) {
+  const { results } = await env.DB.prepare(`SELECT name FROM subteams WHERE id IN (${ids.map(() => '?').join(', ')}) ORDER BY name`).bind(...ids).all()
+  return results.map((r) => r.name).join(' + ')
+}
+
+const setSubteams = (env, entryId, ids) => [
+  env.DB.prepare('DELETE FROM vault_entry_subteams WHERE entry_id = ?').bind(entryId),
+  ...ids.map((sid) => env.DB.prepare('INSERT INTO vault_entry_subteams (entry_id, subteam_id) VALUES (?, ?)').bind(entryId, sid)),
+]
 
 function cryptoFailure(e) {
   if (e instanceof VaultCryptoError) {
@@ -66,10 +102,11 @@ export function vaultRoutes(router, authed) {
   router.get('/api/vault', authed(async (_req, env, user) => {
     const allowed = ACCESS.filter((r) => ROLE_RANK[r] <= ROLE_RANK[user.role])
     const { results } = await env.DB.prepare(
-      `SELECT v.*, u.name AS owner_name FROM vault_entries v LEFT JOIN users u ON u.id = v.owner_id
-        WHERE v.min_role IN (${allowed.map(() => '?').join(', ')}) ORDER BY v.name COLLATE NOCASE`
+      `${SELECT_ENTRY} WHERE v.min_role IN (${allowed.map(() => '?').join(', ')}) ORDER BY v.name COLLATE NOCASE`
     ).bind(...allowed).all()
-    return json({ configured: vaultConfigured(env), entries: results.map((e) => present(e, user)) })
+    // The subteam check is the same function the single-entry routes use.
+    const entries = results.map((r) => ({ ...r, subteam_ids: idList(r.subteam_list) })).filter((e) => canSee(user, e))
+    return json({ configured: vaultConfigured(env), entries: entries.map((e) => present(e, user)) })
   }))
 
   router.post('/api/vault', authed(async (request, env, user) => {
@@ -84,6 +121,7 @@ export function vaultRoutes(router, authed) {
     const seed = totpRaw ? normaliseSeed(totpRaw) : null
     if (totpRaw && !seed) throw badRequest('That authenticator key isn’t valid. Paste the setup key (letters A–Z and 2–7) or the otpauth:// link.')
     const ownerId = v.id(body.owner_id, 'Owner') ?? user.id
+    const subteams = (await subteamIds(env, user, body.subteam_ids)) ?? []
     let secretEnc = null
     let totpEnc = null
     try {
@@ -95,8 +133,9 @@ export function vaultRoutes(router, authed) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${secretEnc ? "datetime('now')" : 'NULL'}, ?)`
     ).bind(id, v.text(body.name, 'Name', { max: 100, required: true }), v.url(body.url, 'Link') ?? '', v.text(body.username, 'Username', { max: 200 }) ?? '',
       secretEnc, totpEnc, v.text(body.notes, 'Notes', { max: 2000 }) ?? '', minRole, ownerId, user.id).run()
+    if (subteams.length) await env.DB.batch(setSubteams(env, id, subteams))
     const entry = await getEntry(env, user, id)
-    await logActivity(env, request, user, { action: 'vault.create', entity: 'vault', entityId: id, summary: `Added “${entry.name}” (${minRole}+)` })
+    await logActivity(env, request, user, { action: 'vault.create', entity: 'vault', entityId: id, summary: `Added “${entry.name}” (${minRole}+${subteams.length ? `, ${await subteamNames(env, subteams)} only` : ''})` })
     return json({ entry: present(entry, user) }, { status: 201 })
   }))
 
@@ -107,6 +146,7 @@ export function vaultRoutes(router, authed) {
     const body = await readBody(request)
     const minRole = v.oneOf(body.min_role, 'Who can see it', ACCESS)
     if (minRole === 'admin') requireRole(user, 'admin', 'Only mentors can make an entry mentor-only.')
+    const subteams = await subteamIds(env, user, body.subteam_ids)
     const sets = []
     const binds = []
     const plain = {
@@ -135,12 +175,18 @@ export function vaultRoutes(router, authed) {
         changed.push('authenticator changed')
       }
     } catch (e) { throw cryptoFailure(e) }
-    if (!sets.length) throw badRequest('Nothing to change.')
+    const subteamsChanged = subteams !== undefined && [...subteams].sort().join() !== [...entry.subteam_ids].sort().join()
+    if (!sets.length && !subteamsChanged) throw badRequest('Nothing to change.')
     sets.push("updated_at = datetime('now')")
-    await env.DB.prepare(`UPDATE vault_entries SET ${sets.join(', ')} WHERE id = ?`).bind(...binds, entry.id).run()
+    await env.DB.batch([
+      env.DB.prepare(`UPDATE vault_entries SET ${sets.join(', ')} WHERE id = ?`).bind(...binds, entry.id),
+      ...(subteamsChanged ? setSubteams(env, entry.id, subteams) : []),
+    ])
     if (minRole && minRole !== entry.min_role) changed.push(`access ${entry.min_role} → ${minRole}`)
+    if (subteamsChanged) changed.push(`subteams ${entry.subteam_ids.length ? await subteamNames(env, entry.subteam_ids) : 'any'} → ${subteams.length ? await subteamNames(env, subteams) : 'any'}`)
     await logActivity(env, request, user, { action: 'vault.update', entity: 'vault', entityId: entry.id, summary: `Edited “${entry.name}”${changed.length ? `: ${changed.join(', ')}` : ''}` })
-    return json({ entry: present(await env.DB.prepare('SELECT v.*, u.name AS owner_name FROM vault_entries v LEFT JOIN users u ON u.id = v.owner_id WHERE v.id = ?').bind(entry.id).first(), user) })
+    const row = await env.DB.prepare(`${SELECT_ENTRY} WHERE v.id = ?`).bind(entry.id).first()
+    return json({ entry: present({ ...row, subteam_ids: idList(row.subteam_list) }, user) })
   }))
 
   router.delete('/api/vault/:id', authed(async (request, env, user) => {

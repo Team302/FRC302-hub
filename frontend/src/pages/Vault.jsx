@@ -91,7 +91,13 @@ function EntryForm({ entry, user, users, onSaved, onClose, onDeleted }) {
   const [form, setForm] = useState({
     name: entry?.name || '', url: entry?.url || '', username: entry?.username || '', notes: entry?.notes || '',
     min_role: entry?.min_role || 'lead', owner_id: entry?.owner_id || user.id, secret: '', totp: '', clearTotp: false,
+    subteam_ids: entry?.subteam_ids || [],
   })
+  const { subteams } = useSession()
+  const mentor = atLeast(user, 'admin')
+  const toggleSubteam = (id) => setForm((f) => ({ ...f, subteam_ids: f.subteam_ids.includes(id) ? f.subteam_ids.filter((x) => x !== id) : [...f.subteam_ids, id] }))
+  // A non-mentor limiting it to subteams has to stay on the list (the server refuses otherwise).
+  const lockedOut = !mentor && form.subteam_ids.length > 0 && !form.subteam_ids.includes(user.subteam_id)
   const run = useRun()
   const [confirm, confirmDialog] = useConfirm()
   const [showSecret, setShowSecret] = useState(false)
@@ -104,7 +110,7 @@ function EntryForm({ entry, user, users, onSaved, onClose, onDeleted }) {
       setBreach(seen)
       if (seen > 0 && !(await confirm({ title: 'Save a breached password?', message: `This password has appeared in ${seen.toLocaleString()} data breaches, so it’s among the first ones attackers try. Change it on the site and save the new one instead.`, confirmLabel: 'Save anyway', tone: 'danger' }))) return
     }
-    const body = { name: form.name, url: form.url, username: form.username, notes: form.notes, min_role: form.min_role }
+    const body = { name: form.name, url: form.url, username: form.username, notes: form.notes, min_role: form.min_role, subteam_ids: form.subteam_ids }
     if (atLeast(user, 'admin')) body.owner_id = form.owner_id
     if (form.secret) body.secret = form.secret
     if (form.totp) body.totp = form.totp
@@ -121,7 +127,7 @@ function EntryForm({ entry, user, users, onSaved, onClose, onDeleted }) {
     <Modal open onClose={onClose} title={editing ? `Edit ${entry.name}` : 'Add to vault'} size="lg"
       footer={<>
         {editing && atLeast(user, 'admin') && <button type="button" className="btn-danger mr-auto" onClick={remove}>Delete</button>}
-        <button className="btn-ghost" onClick={onClose}>Cancel</button><button className="btn-primary" form="vault-form">{editing ? 'Save' : 'Add'}</button>
+        <button className="btn-ghost" onClick={onClose}>Cancel</button><button className="btn-primary" form="vault-form" disabled={lockedOut}>{editing ? 'Save' : 'Add'}</button>
       </>}>
       {confirmDialog}
       <form id="vault-form" onSubmit={submit} className="grid sm:grid-cols-2 gap-4" autoComplete="off">
@@ -145,6 +151,20 @@ function EntryForm({ entry, user, users, onSaved, onClose, onDeleted }) {
             {access.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
           </select>
         </Field>
+        <fieldset>
+          <legend className="label">Only these subteams</legend>
+          <p className="text-xs text-brand-gray-500 mb-2">{form.subteam_ids.length ? 'Only people on a checked subteam (and mentors) can see or reveal it.' : 'None checked: every subteam can see it.'}</p>
+          <div className="flex flex-wrap gap-2">
+            {subteams.map((st) => {
+              const on = form.subteam_ids.includes(st.id)
+              return (
+                <button key={st.id} type="button" aria-pressed={on} onClick={() => toggleSubteam(st.id)}
+                  className={`h-8 px-3 rounded-full text-sm border ${on ? 'bg-accent-600 border-accent-600 text-white' : 'border-brand-gray-200 text-brand-gray-600 hover:border-brand-gray-300'}`}>{st.name}</button>
+              )
+            })}
+          </div>
+          {lockedOut && <p className="text-xs text-status-danger mt-2">Include your own subteam, or you won’t be able to see this entry.</p>}
+        </fieldset>
         {atLeast(user, 'admin') && (
           <Field label="Owner" hint="Who changes the password when someone leaves.">
             <select className="input" value={form.owner_id || ''} onChange={(e) => setForm({ ...form, owner_id: e.target.value })}>
@@ -179,7 +199,7 @@ function AuditModal({ entry, onClose }) {
 }
 
 export default function Vault() {
-  const { user, users } = useSession()
+  const { user, users, subteamById } = useSession()
   const [data, setData] = useState(null)
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState(null)
@@ -231,6 +251,7 @@ export default function Vault() {
                           <h3 className="font-semibold truncate">{e.name}</h3>
                           <span className={e.min_role === 'admin' ? 'badge-danger' : e.min_role === 'lead' ? 'badge-warning' : 'badge-gray'}>{VAULT_ACCESS.find((a) => a.id === e.min_role).label}</span>
                         </div>
+                        {e.subteam_ids?.length > 0 && <p className="text-xs text-brand-gray-500 truncate" title="Only these subteams (and mentors) can see it">{e.subteam_ids.map((id) => subteamById[id]?.name || 'a removed subteam').join(' + ')} only</p>}
                         {e.url && <a href={e.url} target="_blank" rel="noopener noreferrer" className="link text-xs inline-flex items-center gap-1 truncate max-w-full">{new URL(e.url).hostname}<ExternalLink className="w-3 h-3" /></a>}
                       </div>
                       <div className="flex">
