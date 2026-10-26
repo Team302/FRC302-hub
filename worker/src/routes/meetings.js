@@ -12,7 +12,7 @@ import { createItem } from '../lib/items.js'
 
 const KINDS = ['general', 'subteam', 'leadership', 'build', 'mentor']
 const ATTENDANCE = ['present', 'late', 'excused', 'absent']
-const LATE_AFTER_MIN = 10
+export const LATE_AFTER_MIN = 10
 
 const KIND_MIN_ROLE = { leadership: 'lead', mentor: 'admin' }
 const canSee = (user, meeting) => atLeast(user, KIND_MIN_ROLE[meeting.kind] || 'member')
@@ -124,7 +124,8 @@ export function meetingRoutes(router, authed) {
     const [agenda, { results: roster }, { results: actions }] = await Promise.all([
       agendaOf(env, meeting.id),
       env.DB.prepare(
-        `SELECT u.id, u.name, u.subteam_id, t.status, t.recorded_at FROM users u
+        `SELECT u.id, u.name, u.subteam_id, t.status, t.recorded_at, t.via,
+                (SELECT k.name FROM kiosks k WHERE 'kiosk:' || k.id = t.via) AS via_kiosk FROM users u
            LEFT JOIN attendance t ON t.user_id = u.id AND t.meeting_id = ?
           WHERE u.is_active = 1 OR t.status IS NOT NULL ORDER BY u.name COLLATE NOCASE`
       ).bind(meeting.id).all(),
@@ -280,7 +281,7 @@ export function meetingRoutes(router, authed) {
     const status = v.oneOf(body.status, 'Attendance', ATTENDANCE, { required: true })
     await env.DB.prepare(
       `INSERT INTO attendance (meeting_id, user_id, status, recorded_by) VALUES (?, ?, ?, ?)
-       ON CONFLICT(meeting_id, user_id) DO UPDATE SET status = excluded.status, recorded_by = excluded.recorded_by, recorded_at = datetime('now')`
+       ON CONFLICT(meeting_id, user_id) DO UPDATE SET status = excluded.status, recorded_by = excluded.recorded_by, recorded_at = datetime('now'), via = NULL`
     ).bind(meeting.id, target.id, status, user.id).run()
     return json({ ok: true })
   }))
@@ -293,7 +294,7 @@ export function meetingRoutes(router, authed) {
     if (meeting.status !== 'live') throw conflict('Check-in opens when the meeting starts.')
     const late = Date.now() > Date.parse(meeting.starts_at) + LATE_AFTER_MIN * 60 * 1000
     await env.DB.prepare(
-      `INSERT INTO attendance (meeting_id, user_id, status, recorded_by) VALUES (?, ?, ?, ?)
+      `INSERT INTO attendance (meeting_id, user_id, status, recorded_by, via) VALUES (?, ?, ?, ?, 'self')
        ON CONFLICT(meeting_id, user_id) DO NOTHING`
     ).bind(meeting.id, user.id, late ? 'late' : 'present', user.id).run()
     const row = await env.DB.prepare('SELECT status FROM attendance WHERE meeting_id = ? AND user_id = ?').bind(meeting.id, user.id).first()

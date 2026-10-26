@@ -15,6 +15,7 @@ import { calendarRoutes } from './routes/calendar.js'
 import { eventRoutes } from './routes/events.js'
 import { homeRoutes } from './routes/home.js'
 import { itemRoutes } from './routes/items.js'
+import { kioskRoutes } from './routes/kiosk.js'
 import { meetingRoutes } from './routes/meetings.js'
 import { pushRoutes } from './routes/push.js'
 import { reportRoutes } from './routes/reports.js'
@@ -46,6 +47,7 @@ export function buildRouter() {
   attachmentRoutes(router, authed)
   eventRoutes(router, authed)
   backupRoutes(router, authed)
+  kioskRoutes(router, authed)
   router.get('/api/health', () => Response.json({ ok: true }))
   router.all('/api/*', () => { throw new HttpError(404, 'No such API route.', 'not_found') })
   return router
