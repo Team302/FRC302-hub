@@ -90,6 +90,13 @@ with the kiosk it came from on the meeting page, and the person running the meet
 120 days and can be turned off at any time. The screen stays awake while the kiosk page is open (where the browser
 allows it).
 
+**Expenses.** Anyone submits what they spent for the team: amount, vendor, category, whether it was the team's money
+or their own, and a photo or PDF of the receipt. Mentors approve or decline (with a reason the person sees), then mark
+out-of-pocket expenses as paid back. Mentors set a budget per category for each season (Aug 1 to Jul 31, named for the
+kickoff year); leads and mentors see budget vs spent vs waiting for review, and who is owed money, and can export the
+season to CSV for the treasurer. Members see only their own expenses. A mentor can't approve their own reimbursement when
+there's another mentor, and every decision is in the audit log.
+
 **Recurring meetings.** Schedule a weekly series (up to 52) with the same agenda; delete the rest of a series in one go.
 
 **My work.** Every open task and subitem you own across all boards, grouped into Overdue, Today, Next 7 days and later.

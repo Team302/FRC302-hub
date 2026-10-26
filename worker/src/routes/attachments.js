@@ -10,9 +10,9 @@ import { atLeast } from '../lib/auth.js'
 import { badRequest, conflict, forbidden, HttpError, json, newId, notFound } from '../lib/http.js'
 import { getItem } from '../lib/items.js'
 
-const MAX_BYTES = 15 * 1024 * 1024
+export const MAX_BYTES = 15 * 1024 * 1024
 const MAX_PER_ITEM = 25
-const INLINE = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
+export const INLINE = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
 // type → allowed extensions. CAD formats arrive as application/octet-stream, so for those the
 // extension decides.
 const ALLOWED = {
@@ -27,11 +27,11 @@ const ALLOWED = {
   'application/octet-stream': ['step', 'stp', 'stl', 'dxf', 'dwg', 'f3d', 'sldprt', 'sldasm', 'iges', 'igs', 'zip', 'heic', 'pdf', 'csv', 'txt', 'xlsx', 'docx', 'pptx', 'png', 'jpg', 'jpeg'],
 }
 
-function requireStorage(env) {
+export function requireStorage(env) {
   if (!env.FILES) throw new HttpError(503, 'File storage isn’t set up on this server (R2 bucket, see README).', 'files_not_configured')
 }
 
-function cleanFilename(raw) {
+export function cleanFilename(raw) {
   let name = ''
   try { name = decodeURIComponent(raw || '') } catch { name = '' }
   // No path pieces, control characters or quotes; no leading dots (hidden files, "../").
@@ -40,7 +40,7 @@ function cleanFilename(raw) {
   return name
 }
 
-const extOf = (name) => (name.includes('.') ? name.split('.').pop().toLowerCase() : '')
+export const extOf = (name) => (name.includes('.') ? name.split('.').pop().toLowerCase() : '')
 
 // Deletes the stored files for these items (and their subitems' files). Call before deleting
 // the rows: once the rows cascade away, the R2 keys can't be found any more.

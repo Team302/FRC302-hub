@@ -3,7 +3,7 @@
 // been removed from the team are never notified.
 import { pushConfigured, pushToUser } from './webpush.js'
 
-const PUSH_TITLE = { assigned: 'Assigned to you', mentioned: 'You were mentioned', update: 'New update', status: 'Status changed', due: 'Due soon', automation: 'Automation', review: 'Review' }
+const PUSH_TITLE = { assigned: 'Assigned to you', mentioned: 'You were mentioned', update: 'New update', status: 'Status changed', due: 'Due soon', automation: 'Automation', review: 'Review', expense: 'Expense' }
 
 export async function notify(env, { userIds, actorId = null, kind, itemId = null, body }) {
   const wanted = [...new Set(userIds.filter(Boolean))].filter((id) => id !== actorId)
