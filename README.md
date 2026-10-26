@@ -74,6 +74,14 @@ again to pick up date or venue changes; a competition you'd already typed in is 
 event Home shows **rank, qual record, alliance, and the next and last match** with partners, opponents and the
 predicted start time, refreshed every minute. The team number is `TEAM_NUMBER` in `wrangler.toml`.
 
+**Equipment.** Tools, laptops, robot spares and safety gear: what the team has, where it lives, its condition, and
+who has it. A row can be a bin of identical things ("4 of 6 available"). Members **borrow** for themselves and return
+their own; leads and mentors add and edit items, **lend** to anyone and record any return. Lending checks what's on the
+shelf in one database statement, so two people can't take the last one. Retired and lost items can't go out. Coming
+back damaged (needs repair, broken) updates the item and tells the leads and mentors; a few lost from a bin shrinks the
+bin. Overdue borrowers get a reminder once a day. **You're holding** at the top of the page lists what you have out.
+An item someone still has can't be deleted, only retired. Leads can export the list to CSV.
+
 **Workload** (leads and mentors). Open, overdue, due-this-week and stuck tasks per person across every board, with
 who has nothing assigned.
 
@@ -141,6 +149,8 @@ notifications) that ticks itself off.
 | Vault: add entries; edit their own | | ✓ | ✓ |
 | Vault: mentor-only entries, delete, access logs | | | ✓ |
 | Add or remove people, change roles, subteams | | | ✓ |
+| Equipment: see everything; borrow and return for yourself | ✓ | ✓ | ✓ |
+| Equipment: add, edit, delete; lend to anyone; record any return; export | | ✓ | ✓ |
 | Activity log | | | ✓ |
 | See teammates' email addresses | own only | ✓ | ✓ |
 
@@ -184,6 +194,9 @@ Members can't see other people's emails. If your district has a data-privacy agr
   passwords, recovery codes or PINs in notes.
 - **No storage quota for attachments.** Each file is capped at 15 MB, but there's no per-person or team total yet;
   watch the R2 bucket's size in the Cloudflare dashboard.
+- **Equipment is an honour system.** The app records what people say they took and brought back; it can't see the
+  shelf. A member can mark their own loan returned (in good condition) without handing anything back. Every lend and
+  return is in the audit log with who recorded it, so check the shelf against the list now and then.
 - **The kiosk trusts whoever is at the tablet.** Anyone standing there can check in a friend who isn't there. It's
   better evidence than self check-in (the tablet is in the shop), not proof. Check the count against the room.
 - **Self check-in trusts the device.** It proves someone had the app open while the meeting was live, not that they were in

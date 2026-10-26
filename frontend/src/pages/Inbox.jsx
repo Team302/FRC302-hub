@@ -2,7 +2,7 @@
 // reminders and automation alerts. Opening one marks it read.
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AtSign, Bell, CheckCheck, Clock, MessageSquare, RefreshCw, UserPlus, Zap } from 'lucide-react'
+import { AtSign, Bell, CheckCheck, Clock, MessageSquare, RefreshCw, UserPlus, Wrench, Zap } from 'lucide-react'
 import { get, post } from '../lib/api'
 import { useSession } from '../context/Session'
 import { fmtFull, parseServerTime, relative } from '../lib/format'
@@ -12,7 +12,7 @@ import FilterChips from '../components/ui/FilterChips'
 import { SkeletonTable } from '../components/ui/Skeleton'
 import PushToggle from '../components/PushToggle'
 
-const ICON = { assigned: UserPlus, mentioned: AtSign, update: MessageSquare, status: RefreshCw, due: Clock, automation: Zap }
+const ICON = { assigned: UserPlus, mentioned: AtSign, update: MessageSquare, status: RefreshCw, due: Clock, automation: Zap, equipment: Wrench }
 
 export default function Inbox() {
   const { setUnread } = useSession()
@@ -29,6 +29,7 @@ export default function Inbox() {
       post('/notifications/read', { ids: [n.id] }).catch(() => {})
     }
     if (n.item_id && n.board_id) navigate(`/boards/${n.board_id}?item=${n.item_id}`)
+    else if (n.kind === 'equipment') navigate('/equipment')
   }
   const readAll = async () => { await post('/notifications/read', { all: true }); load() }
 
