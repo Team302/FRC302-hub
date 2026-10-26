@@ -4,3 +4,4 @@ frontend/dist/
 .dev.vars
 *.log
 .DS_Store
+.claude/worktrees/
