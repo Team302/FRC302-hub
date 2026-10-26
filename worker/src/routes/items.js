@@ -270,10 +270,10 @@ export function itemRoutes(router, authed) {
       `SELECT ${ITEM_COLUMNS}, b.name AS board_name, b.color AS board_color, p.title AS parent_title
          FROM live_items i JOIN boards b ON b.id = i.board_id LEFT JOIN users u ON u.id = i.assignee_id LEFT JOIN live_items p ON p.id = i.parent_id
         WHERE i.reviewer_id = ? AND i.status = 'review' AND b.is_archived = 0
-        ORDER BY i.updated_at`
+        ORDER BY i.review_requested_at, i.updated_at`
     ).bind(user.id).all()
     const { results } = await env.DB.prepare(
-      `SELECT ${ITEM_COLUMNS}, b.name AS board_name, b.color AS board_color, p.title AS parent_title
+      `SELECT ${ITEM_COLUMNS}, b.name AS board_name, b.color AS board_color, b.require_approval AS board_require_approval, p.title AS parent_title
          FROM live_items i JOIN boards b ON b.id = i.board_id LEFT JOIN users u ON u.id = i.assignee_id LEFT JOIN live_items p ON p.id = i.parent_id
         WHERE i.assignee_id = ? AND i.status <> 'done' AND b.is_archived = 0
         ORDER BY i.due_date IS NULL, i.due_date, CASE i.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END`

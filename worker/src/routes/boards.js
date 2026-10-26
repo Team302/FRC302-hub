@@ -151,7 +151,7 @@ export function boardRoutes(router, authed) {
     const [{ results: groups }, { results: items }, { results: columns }, { results: values }, auto] = await Promise.all([
       env.DB.prepare('SELECT * FROM board_groups WHERE board_id = ? ORDER BY position').bind(board.id).all(),
       env.DB.prepare(`SELECT i.id, i.board_id, i.group_id, i.parent_id, i.title, i.status, i.priority, i.assignee_id, i.due_date, i.position,
-                             i.reviewer_id, i.approved_by, i.approved_at, i.created_by, i.created_at, i.updated_at, i.completed_at, u.name AS assignee_name,
+                             i.reviewer_id, i.approved_by, i.approved_at, i.review_requested_at, i.created_by, i.created_at, i.updated_at, i.completed_at, u.name AS assignee_name,
                              (SELECT COUNT(*) FROM item_updates iu WHERE iu.item_id = i.id) AS update_count,
                              (SELECT COUNT(*) FROM attachments a WHERE a.item_id = i.id) AS file_count
                         FROM live_items i LEFT JOIN users u ON u.id = i.assignee_id WHERE i.board_id = ? ORDER BY i.position, i.created_at`).bind(board.id).all(),

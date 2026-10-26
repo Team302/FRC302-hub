@@ -42,6 +42,16 @@ export const RANK = { member: 1, lead: 2, admin: 3 }
 export const atLeast = (user, role) => (RANK[user?.role] || 0) >= RANK[role]
 // Mirrors the server (worker/src/lib/items.js): a lead or mentor, or the task's reviewer when
 // they aren't also its owner. Only used to choose which buttons to show; the server decides.
+// Mirrors canReview on the server: any lead or mentor, or someone on the task's subteam (the
+// board's; without one, the owner's). Never the owner. Used to fill the reviewer picker.
+export function reviewerOptions(users, board, ownerId) {
+  const owner = users.find((u) => u.id === ownerId)
+  const scope = board?.subteam_id || owner?.subteam_id || null
+  return users.filter((u) => u.id !== ownerId && (u.role === 'lead' || u.role === 'admin' || (scope && u.subteam_id === scope)))
+}
+// Why Done is locked for this person on this task, or null when it isn't.
+export const doneLock = (user, board, item) => (board?.require_approval && item.status !== 'done' && !canApprove(user, item)
+  ? (item.reviewer_id ? 'Needs approval: submit for review' : 'Needs approval: pick a reviewer, then submit for review') : null)
 export const canApprove = (user, item) => atLeast(user, 'lead') || (!!item.reviewer_id && item.reviewer_id === user?.id && item.assignee_id !== user?.id)
 
 export const MEETING_KINDS = [

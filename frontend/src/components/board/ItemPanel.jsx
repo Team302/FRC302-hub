@@ -7,7 +7,7 @@ import { BadgeCheck, CalendarDays, Copy, Eye, History, ListTree, MessageSquare, 
 import { get, post } from '../../lib/api'
 import { useSession } from '../../context/Session'
 import { useToast } from '../../context/ToastContext'
-import { atLeast, canApprove } from '../../lib/constants'
+import { atLeast, canApprove, doneLock, reviewerOptions } from '../../lib/constants'
 import { parseServerTime, relative, fmtFull } from '../../lib/format'
 import Avatar from '../ui/Avatar'
 import SegmentedControl from '../ui/SegmentedControl'
@@ -214,9 +214,9 @@ export default function ItemPanel({ itemId, board, data, statuses, actions, onCl
           <div className="px-6 py-4">
             <div className="mb-3 empty:hidden"><ReviewBar item={item} board={board} user={user} users={users} actions={actions} /></div>
             <div className="card px-3">
-              <Field label="Status"><StatusCell value={item.status} statuses={statuses} onChange={(status) => actions.updateItem(item.id, { status })} /></Field>
+              <Field label="Status"><StatusCell value={item.status} statuses={statuses} lockDone={doneLock(user, board, item)} onChange={(status) => actions.updateItem(item.id, { status })} /></Field>
               {!hidden.includes('owner') && <Field label="Owner"><PeopleCell value={item.assignee_id} users={users} onChange={(assignee_id) => actions.updateItem(item.id, { assignee_id })} /></Field>}
-              <Field label="Reviewer"><PeopleCell label="Reviewer" value={item.reviewer_id} users={users.filter((u) => u.id !== item.assignee_id)} onChange={(reviewer_id) => actions.updateItem(item.id, { reviewer_id })} /></Field>
+              <Field label="Reviewer"><PeopleCell label="Reviewer" value={item.reviewer_id} users={reviewerOptions(users, board, item.assignee_id)} onChange={(reviewer_id) => actions.updateItem(item.id, { reviewer_id })} /></Field>
               {!hidden.includes('priority') && <Field label="Priority"><PriorityCell value={item.priority} onChange={(priority) => actions.updateItem(item.id, { priority })} /></Field>}
               {!hidden.includes('due') && <Field label="Due date"><DateCell due label="Due date" value={item.due_date} done={item.status === 'done'} onChange={(due_date) => actions.updateItem(item.id, { due_date })} /></Field>}
               {!item.parent_id && (

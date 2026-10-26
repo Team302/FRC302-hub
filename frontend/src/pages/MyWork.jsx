@@ -4,7 +4,8 @@ import { Link } from 'react-router-dom'
 import { BadgeCheck, CheckCircle2, Eye } from 'lucide-react'
 import { get, patch, post } from '../lib/api'
 import { useToast } from '../context/ToastContext'
-import { STATUSES, SWATCH } from '../lib/constants'
+import { doneLock, STATUSES, SWATCH } from '../lib/constants'
+import { useSession } from '../context/Session'
 import { parseServerTime, relative, todayIso } from '../lib/format'
 import Avatar from '../components/ui/Avatar'
 import PageHeader from '../components/ui/PageHeader'
@@ -26,6 +27,7 @@ const BUCKETS = [['overdue', 'Overdue'], ['today', 'Today'], ['week', 'Next 7 da
 
 export default function MyWork() {
   const [items, setItems] = useState(null)
+  const { user } = useSession()
   const [toReview, setToReview] = useState([])
   const { error, success } = useToast()
   useEffect(() => { get('/my-work').then((d) => { setItems(d.items); setToReview(d.to_review || []) }) }, [])
@@ -58,7 +60,7 @@ export default function MyWork() {
                 <Avatar name={i.assignee_name || '?'} seed={i.assignee_id} size="sm" />
                 <div className="flex-1 min-w-0">
                   <Link to={`/boards/${i.board_id}?item=${i.id}`} className="font-medium text-brand-black hover:text-accent-700">{i.title}</Link>
-                  <p className="text-xs text-brand-gray-500 truncate">{i.assignee_name || 'No owner'} · {i.board_name}{i.parent_title ? ` · subitem of ${i.parent_title}` : ''} · submitted {relative(parseServerTime(i.updated_at))}</p>
+                  <p className="text-xs text-brand-gray-500 truncate">{i.assignee_name || 'No owner'} · {i.board_name}{i.parent_title ? ` · subitem of ${i.parent_title}` : ''} · submitted {relative(parseServerTime(i.review_requested_at || i.updated_at))}</p>
                 </div>
                 <Link to={`/boards/${i.board_id}?item=${i.id}`} className="btn-secondary btn-sm">Open</Link>
                 <button type="button" className="btn-primary btn-sm" onClick={() => approve(i)}><BadgeCheck className="w-3.5 h-3.5" />Approve</button>
@@ -89,7 +91,7 @@ export default function MyWork() {
                             {i.parent_title && <span className="text-xs text-brand-gray-500"> · subitem of {i.parent_title}</span>}
                           </td>
                           <td className="truncate"><span className="inline-flex items-center gap-1.5 text-brand-gray-600"><span className={`w-2 h-2 rounded-sm ${SWATCH[i.board_color]}`} />{i.board_name}</span></td>
-                          <td className="p-0"><StatusCell value={i.status} statuses={STATUSES} onChange={(status) => update(i, { status })} /></td>
+                          <td className="p-0"><StatusCell value={i.status} statuses={STATUSES} lockDone={doneLock(user, { require_approval: i.board_require_approval }, i)} onChange={(status) => update(i, { status })} /></td>
                           <td className="p-0"><PriorityCell value={i.priority} onChange={(priority) => update(i, { priority })} /></td>
                           <td className="text-right"><DueText due={i.due_date} /></td>
                         </tr>

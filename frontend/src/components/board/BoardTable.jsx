@@ -6,7 +6,7 @@ import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, GripVertical, Maximize2,
 import Popover from './Popover'
 import { ColumnCell, DateCell, PeopleCell, PriorityCell, StatusCell } from './cells'
 import { AddColumnButton, ColumnHeader, SummaryCell } from './columns'
-import { BORDER, COLORS, SWATCH, TEXT } from '../../lib/constants'
+import { BORDER, COLORS, doneLock, reviewerOptions, SWATCH, TEXT } from '../../lib/constants'
 
 const CHECK_W = 44
 // Narrower pinned task column on phones, so the other columns are reachable.
@@ -60,7 +60,7 @@ function GroupMenu({ group, users, isFirst, isLast, onRename, onColor, onReviewe
 }
 
 function Row({ item, cols, ctx, titleW, depth, subCount, expanded, onToggleExpand, groupColor, dragProps, dropIndicator }) {
-  const { values, users, statuses, selected, toggleSelect, actions, openItem, canEdit } = ctx
+  const { values, users, statuses, selected, toggleSelect, actions, openItem, canEdit, board, me } = ctx
   const v = values[item.id] || {}
   const pinnedBg = selected.has(item.id) ? 'bg-accent-50' : depth ? 'bg-brand-gray-50' : 'bg-white'
   return (
@@ -93,8 +93,8 @@ function Row({ item, cols, ctx, titleW, depth, subCount, expanded, onToggleExpan
       {cols.map((col) => (
         <td key={col.key} className="p-0 border-b border-r border-brand-gray-200" style={{ width: col.width }}>
           {col.key === 'owner' ? <PeopleCell value={item.assignee_id} users={users} readOnly={!canEdit} onChange={(assignee_id) => actions.updateItem(item.id, { assignee_id })} />
-            : col.key === 'reviewer' ? <PeopleCell label="Reviewer" value={item.reviewer_id} users={users.filter((u) => u.id !== item.assignee_id)} readOnly={!canEdit} onChange={(reviewer_id) => actions.updateItem(item.id, { reviewer_id })} />
-            : col.key === 'status' ? <StatusCell value={item.status} statuses={statuses} readOnly={!canEdit} onChange={(status) => actions.updateItem(item.id, { status })} />
+            : col.key === 'reviewer' ? <PeopleCell label="Reviewer" value={item.reviewer_id} users={reviewerOptions(users, board, item.assignee_id)} readOnly={!canEdit} onChange={(reviewer_id) => actions.updateItem(item.id, { reviewer_id })} />
+            : col.key === 'status' ? <StatusCell value={item.status} statuses={statuses} readOnly={!canEdit} lockDone={doneLock(me, board, item)} onChange={(status) => actions.updateItem(item.id, { status })} />
               : col.key === 'priority' ? <PriorityCell value={item.priority} readOnly={!canEdit} onChange={(priority) => actions.updateItem(item.id, { priority })} />
                 : col.key === 'due' ? <DateCell due label="Due date" value={item.due_date} done={item.status === 'done'} readOnly={!canEdit} onChange={(due_date) => actions.updateItem(item.id, { due_date })} />
                   : <ColumnCell column={col.column} value={v[col.key] ?? null} users={users} readOnly={!canEdit} onChange={(val) => actions.setValue(item.id, col.key, val)} />}
@@ -183,7 +183,7 @@ export default function BoardTable({ groups, cols, itemsByGroup, subitemsOf, ctx
                 )}
                 <span className="text-xs text-brand-gray-500 ml-1">{items.length} {items.length === 1 ? 'task' : 'tasks'}</span>
                 {group.default_reviewer_id && <span className="text-xs text-brand-gray-400">· reviewed by {ctx.users.find((u) => u.id === group.default_reviewer_id)?.name.split(' ')[0] || 'a former member'}</span>}
-                {canManage && <GroupMenu group={group} users={ctx.users} isFirst={gi === 0} isLast={gi === groups.length - 1}
+                {canManage && <GroupMenu group={group} users={reviewerOptions(ctx.users, ctx.board, null)} isFirst={gi === 0} isLast={gi === groups.length - 1}
                   onRename={() => setRenaming(group.id)} onColor={(color) => groupHandlers.update(group.id, { color })}
                   onReviewer={(default_reviewer_id) => groupHandlers.update(group.id, { default_reviewer_id })}
                   onMove={(dir) => groupHandlers.move(group.id, dir)} onDelete={() => groupHandlers.remove(group)} />}

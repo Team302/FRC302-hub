@@ -1,11 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { makeTeam } from './harness.mjs'
+import { sendReviewReminders } from '../src/lib/reminders.js'
 
 // mentor (admin), lead, alex and sam (members). Approval-required board unless noted.
 async function setup({ approval = true } = {}) {
   const app = await makeTeam()
-  const board = (await app.call('lead', 'POST', '/api/boards', { name: 'Robot' })).data.board
+  // alex and sam both on Mechanical, so they can review each other's work on a Mechanical board.
+  app.sql("UPDATE users SET subteam_id = 'st_mech' WHERE id = ?", app.users.sam.id)
+  const board = (await app.call('lead', 'POST', '/api/boards', { name: 'Robot', subteam_id: 'st_mech' })).data.board
   if (approval) assert.equal((await app.call('lead', 'PATCH', `/api/boards/${board.id}`, { require_approval: true })).status, 200)
   const group = (await app.call('lead', 'GET', `/api/boards/${board.id}`)).data.groups[0]
   const u = app.users
@@ -128,4 +131,53 @@ test('group default reviewer, My work “to review”, workload count', async ()
   assert.equal(mine.to_review[0].assignee_name, 'Alex')
   const sam = (await app.call('lead', 'GET', '/api/reports/workload')).data.people.find((p) => p.user_id === u.sam.id)
   assert.equal(sam.reviewing, 1)
+})
+
+test('who can review: leads, mentors, or the subteam (the board’s, else the owner’s)', async () => {
+  const app = await makeTeam()
+  const u = app.users
+  await app.addUser('pat', 'member', { name: 'Pat', subteam_id: 'st_mech' })
+  // alex: Mechanical, sam: Electrical, lead: Programming.
+  const mech = (await app.call('lead', 'POST', '/api/boards', { name: 'Mech', subteam_id: 'st_mech' })).data.board
+  const g = (await app.call('lead', 'GET', `/api/boards/${mech.id}`)).data.groups[0]
+  const t = (await app.call('alex', 'POST', '/api/items', { board_id: mech.id, group_id: g.id, title: 'T', assignee_id: u.alex.id })).data.item
+  const sam = await app.call('alex', 'PATCH', `/api/items/${t.id}`, { reviewer_id: u.sam.id })
+  assert.equal(sam.status, 400)
+  assert.match(sam.data.error, /leads, mentors, or someone on/)
+  assert.equal((await app.call('alex', 'PATCH', `/api/items/${t.id}`, { reviewer_id: u.pat.id })).status, 200, 'same subteam')
+  assert.equal((await app.call('alex', 'PATCH', `/api/items/${t.id}`, { reviewer_id: u.lead.id })).status, 200, 'any lead')
+  assert.equal((await app.call('alex', 'PATCH', `/api/items/${t.id}`, { reviewer_id: u.mentor.id })).status, 200, 'any mentor')
+
+  // A board with no subteam goes by the owner's subteam.
+  const open = (await app.call('lead', 'POST', '/api/boards', { name: 'Open' })).data.board
+  const og = (await app.call('lead', 'GET', `/api/boards/${open.id}`)).data.groups[0]
+  const t2 = (await app.call('sam', 'POST', '/api/items', { board_id: open.id, group_id: og.id, title: 'T2', assignee_id: u.sam.id })).data.item
+  assert.equal((await app.call('sam', 'PATCH', `/api/items/${t2.id}`, { reviewer_id: u.pat.id })).status, 400)
+  const t3 = (await app.call('alex', 'POST', '/api/items', { board_id: open.id, group_id: og.id, title: 'T3', assignee_id: u.alex.id, reviewer_id: u.pat.id })).data.item
+  assert.equal(t3.reviewer_id, u.pat.id)
+  // Handing T3 to sam would leave a reviewer from the wrong subteam: refused.
+  assert.equal((await app.call('alex', 'PATCH', `/api/items/${t3.id}`, { assignee_id: u.sam.id })).status, 400)
+  // No subteam anywhere: leads and mentors only.
+  app.sql('UPDATE users SET subteam_id = NULL WHERE id = ?', u.sam.id)
+  assert.equal((await app.call('sam', 'PATCH', `/api/items/${t2.id}`, { reviewer_id: u.alex.id })).status, 400)
+
+  // A group default reviewer from another subteam is skipped, not applied.
+  await app.call('lead', 'PATCH', `/api/groups/${g.id}`, { default_reviewer_id: u.sam.id })
+  const t4 = (await app.call('alex', 'POST', '/api/items', { board_id: mech.id, group_id: g.id, title: 'T4', assignee_id: u.alex.id })).data.item
+  assert.equal(t4.reviewer_id, null)
+})
+
+test('reviews waiting 2+ days get one reminder a day', async () => {
+  const { app, u, mk } = await setup({ approval: false })
+  const item = (await mk('alex', { assignee_id: u.alex.id, reviewer_id: u.sam.id })).data.item
+  await app.call('alex', 'PATCH', `/api/items/${item.id}`, { status: 'review' })
+  assert.ok((await app.call('alex', 'GET', `/api/items/${item.id}`)).data.item.review_requested_at)
+  assert.equal(await sendReviewReminders(app.env), 0, 'not yet')
+  app.sql("UPDATE items SET review_requested_at = datetime('now', '-3 days') WHERE id = ?", item.id)
+  assert.equal(await sendReviewReminders(app.env), 1)
+  assert.equal(await sendReviewReminders(app.env), 0, 'once a day')
+  assert.ok((await inbox(app, 'sam')).some((n) => /waited 3 days for your review \(Alex\)/.test(n.body)))
+  // Leaving review clears the clock.
+  await app.call('sam', 'POST', `/api/items/${item.id}/approve`)
+  assert.equal((await app.call('alex', 'GET', `/api/items/${item.id}`)).data.item.review_requested_at, null)
 })

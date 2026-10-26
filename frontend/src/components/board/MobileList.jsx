@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight, MessageSquare, Paperclip, Plus } from 'lucid
 import Avatar from '../ui/Avatar'
 import { StatusCell } from './cells'
 import { DueText } from '../../pages/Home'
-import { SWATCH, TEXT } from '../../lib/constants'
+import { SWATCH, TEXT, doneLock } from '../../lib/constants'
 
 function AddTask({ onAdd, label }) {
   const [title, setTitle] = useState('')
@@ -21,7 +21,7 @@ function AddTask({ onAdd, label }) {
 
 export default function MobileList({ groups, itemsByGroup, subitemsOf, ctx, readOnly }) {
   const [collapsed, setCollapsed] = useState(() => new Set())
-  const { users, statuses, actions, openItem } = ctx
+  const { users, statuses, actions, openItem, board, me } = ctx
   const toggle = (id) => setCollapsed((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   return (
@@ -54,7 +54,7 @@ export default function MobileList({ groups, itemsByGroup, subitemsOf, ctx, read
                             {item.file_count > 0 && <span className="flex items-center gap-0.5"><Paperclip className="w-3 h-3" />{item.file_count}</span>}
                           </span>
                         </button>
-                        <div className="px-3 pb-2.5 pt-1 w-40"><div className="rounded-md overflow-hidden"><StatusCell value={item.status} statuses={statuses} readOnly={readOnly} onChange={(status) => actions.updateItem(item.id, { status })} /></div></div>
+                        <div className="px-3 pb-2.5 pt-1 w-40"><div className="rounded-md overflow-hidden"><StatusCell value={item.status} statuses={statuses} readOnly={readOnly} lockDone={doneLock(me, board, item)} onChange={(status) => actions.updateItem(item.id, { status })} /></div></div>
                       </div>
                     </div>
                   )

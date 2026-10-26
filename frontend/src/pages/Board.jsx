@@ -110,7 +110,7 @@ export default function Board() {
 
   const filtering = q || person || filter !== EMPTY_FILTER
   const selectedIds = [...selected].filter((sid) => data.items.some((i) => i.id === sid))
-  const ctx = { values: data.values, users, statuses, selected, setSelected, toggleSelect: (sid) => setSelected((p) => { const n = new Set(p); n.has(sid) ? n.delete(sid) : n.add(sid); return n }), actions: board, openItem, canEdit: !data.board.is_archived }
+  const ctx = { values: data.values, users, statuses, selected, setSelected, toggleSelect: (sid) => setSelected((p) => { const n = new Set(p); n.has(sid) ? n.delete(sid) : n.add(sid); return n }), actions: board, openItem, canEdit: !data.board.is_archived, board: data.board, me: user }
 
   async function deleteSelected() {
     const ids = selectedIds

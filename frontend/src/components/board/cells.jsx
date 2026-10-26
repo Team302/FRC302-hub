@@ -20,21 +20,25 @@ export function StatusPill({ status, statuses, small }) {
 }
 
 // A list of colour blocks to choose from (status, priority, custom status labels).
-function LabelPicker({ options, value, onPick, onClear }) {
+// locked: { [optionId]: reason } greys those options out and shows the reason underneath.
+function LabelPicker({ options, value, onPick, onClear, locked = {} }) {
+  const reason = Object.values(locked).find(Boolean)
   return (
     <div className="p-2 grid gap-1.5 w-48">
       {options.map((o) => (
-        <button key={o.id} type="button" onClick={() => onPick(o.id)} style={{ backgroundColor: o.fill, color: o.ink }}
-          className={`h-8 rounded-md text-[13px] font-medium px-2 truncate transition-[filter] hover:brightness-110 ${o.id === value ? 'ring-2 ring-offset-2 ring-offset-white ring-brand-black/50' : ''}`}>
+        <button key={o.id} type="button" onClick={() => onPick(o.id)} style={{ backgroundColor: o.fill, color: o.ink }} disabled={!!locked[o.id]} title={locked[o.id] || undefined}
+          className={`h-8 rounded-md text-[13px] font-medium px-2 truncate transition-[filter] hover:brightness-110 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:brightness-100 ${o.id === value ? 'ring-2 ring-offset-2 ring-offset-white ring-brand-black/50' : ''}`}>
           {o.label || ' '}
         </button>
       ))}
+      {reason && <p className="text-[11px] leading-4 text-brand-gray-500 px-0.5">{reason}</p>}
       {onClear && <button type="button" onClick={onClear} className="h-8 rounded-md text-xs text-brand-gray-500 border border-dashed border-brand-gray-300 hover:text-brand-black">Clear</button>}
     </div>
   )
 }
 
-export function StatusCell({ value, statuses, onChange, readOnly }) {
+// lockDone: a reason string when this person can't mark the task Done (boards that need approval).
+export function StatusCell({ value, statuses, onChange, readOnly, lockDone = null }) {
   const s = statuses.find((x) => x.id === value) || statuses[0]
   return (
     <Popover trigger={({ toggle, ref }) => (
@@ -42,7 +46,7 @@ export function StatusCell({ value, statuses, onChange, readOnly }) {
         <Fill fill={s.fill} ink={s.ink} className="hover:brightness-105">{s.label}</Fill>
       </button>
     )}>
-      {(close) => <LabelPicker options={statuses} value={value} onPick={(v) => { onChange(v); close() }} />}
+      {(close) => <LabelPicker options={statuses} value={value} locked={{ done: lockDone }} onPick={(v) => { onChange(v); close() }} />}
     </Popover>
   )
 }
