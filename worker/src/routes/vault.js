@@ -16,6 +16,19 @@ import * as v from '../lib/validate.js'
 import { openSecret, sealSecret, vaultAad, vaultConfigured, VaultCryptoError } from '../lib/vaultCrypto.js'
 
 const ACCESS = ['admin', 'lead', 'member']
+const ROLE_COLLECTION = { member: 'Everyone', lead: 'Leads', admin: 'Mentors' }
+
+// Moving to a real password manager (README → Passwords): set PASSWORDS_URL to the team's
+// Bitwarden organization. From then on the hub vault is read-only and only mentors can open it,
+// to export it and check the import; everyone else is pointed at PASSWORDS_URL.
+export function movedTo(env) {
+  try {
+    const url = new URL(env.PASSWORDS_URL || '')
+    return url.protocol === 'https:' ? url.href : null
+  } catch { return null }
+}
+const moved = () => new HttpError(410, 'The team’s passwords have moved. Use the link on the Passwords page.', 'vault_moved')
+function requireNotMoved(env) { if (movedTo(env)) throw moved() }
 const REVEALS_PER_HOUR = 30
 
 // "st_a,st_b" (GROUP_CONCAT) → ['st_a', 'st_b']
@@ -44,6 +57,7 @@ function requireVault(env) {
 }
 
 async function getEntry(env, user, id) {
+  if (movedTo(env) && !atLeast(user, 'admin')) throw moved()
   const row = await env.DB.prepare(`${SELECT_ENTRY} WHERE v.id = ?`).bind(id).first()
   const e = row && { ...row, subteam_ids: idList(row.subteam_list) }
   if (!e || !canSee(user, e)) throw notFound('That vault entry')
@@ -106,12 +120,16 @@ export function vaultRoutes(router, authed) {
     ).bind(...allowed).all()
     // The subteam check is the same function the single-entry routes use.
     const entries = results.map((r) => ({ ...r, subteam_ids: idList(r.subteam_list) })).filter((e) => canSee(user, e))
-    return json({ configured: vaultConfigured(env), entries: entries.map((e) => present(e, user)) })
+    const movedUrl = movedTo(env)
+    // After the move only mentors still see what's here (to export it and check the import).
+    const visible = movedUrl && !atLeast(user, 'admin') ? [] : entries
+    return json({ configured: vaultConfigured(env), moved_to: movedUrl, entries: visible.map((e) => present(e, user)) })
   }))
 
   router.post('/api/vault', authed(async (request, env, user) => {
     requireRole(user, 'lead')
     requireVault(env)
+    requireNotMoved(env)
     const body = await readBody(request)
     const minRole = v.oneOf(body.min_role ?? 'lead', 'Who can see it', ACCESS)
     if (minRole === 'admin') requireRole(user, 'admin', 'Only mentors can create mentor-only entries.')
@@ -141,6 +159,7 @@ export function vaultRoutes(router, authed) {
 
   router.patch('/api/vault/:id', authed(async (request, env, user) => {
     requireVault(env)
+    requireNotMoved(env)
     const entry = await getEntry(env, user, request.params.id)
     if (!canEdit(user, entry)) throw forbidden('Only a mentor or this entry’s owner can change it.')
     const body = await readBody(request)
@@ -234,6 +253,75 @@ export function vaultRoutes(router, authed) {
         WHERE a.entity = 'vault' AND a.entity_id = ? ORDER BY a.id DESC LIMIT 200`
     ).bind(entry.id).all()
     return json({ audit: results })
+  }))
+
+  // Everything in the vault as a Bitwarden organization import (unencrypted JSON, Bitwarden's own
+  // format). Each entry goes into collections named after its subteams and role, e.g. "Mechanical"
+  // or "Programming (leads)", or "Everyone" / "Leads" / "Mentors" without subteams. This file holds
+  // every password in plain text: mentors only, at most 3 an hour, and logged.
+  router.get('/api/vault/export/bitwarden', authed(async (request, env, user) => {
+    requireRole(user, 'admin', 'Only mentors can export the vault.')
+    requireVault(env)
+    if (!(await rateLimit(env, `vault-export:${user.id}`, 3, 3600))) throw new HttpError(429, 'The vault was exported 3 times this hour. Try again later.', 'rate_limited')
+    const [{ results: rows }, { results: subteams }] = await Promise.all([
+      env.DB.prepare(`${SELECT_ENTRY} ORDER BY v.name COLLATE NOCASE`).all(),
+      env.DB.prepare('SELECT id, name FROM subteams').all(),
+    ])
+    const stName = Object.fromEntries(subteams.map((st) => [st.id, st.name]))
+    const collections = new Map()
+    const collectionId = (name) => {
+      if (!collections.has(name)) collections.set(name, crypto.randomUUID())
+      return collections.get(name)
+    }
+    // Audit first, like a reveal: if the log write fails, nothing is exported.
+    await logActivity(env, request, user, { action: 'vault.export', entity: 'vault', summary: `Exported all ${rows.length} vault entries (passwords included) for Bitwarden` })
+    const items = []
+    const failed = []
+    for (const row of rows) {
+      const e = { ...row, subteam_ids: idList(row.subteam_list) }
+      let password = null
+      let totp = null
+      try {
+        if (e.secret_enc) password = (await openSecret(env, e.secret_enc, vaultAad(e.id, 'secret_enc'))).plaintext
+        if (e.totp_enc) totp = (await openSecret(env, e.totp_enc, vaultAad(e.id, 'totp_enc'))).plaintext
+      } catch {
+        failed.push(e.name)
+        continue
+      }
+      const suffix = e.min_role === 'member' ? '' : e.min_role === 'lead' ? ' (leads)' : ' (mentors)'
+      const names = e.subteam_ids.length ? e.subteam_ids.map((id) => `${stName[id] || 'Removed subteam'}${suffix}`) : [ROLE_COLLECTION[e.min_role]]
+      items.push({
+        type: 1, reprompt: 0, favorite: false, folderId: null, organizationId: null,
+        name: e.name,
+        notes: [e.notes, e.owner_name ? `Owner in 302 Hub: ${e.owner_name}` : ''].filter(Boolean).join('\n\n') || null,
+        login: { username: e.username || null, password, totp, uris: e.url ? [{ match: null, uri: e.url }] : [] },
+        collectionIds: names.map(collectionId),
+      })
+    }
+    if (failed.length) throw new HttpError(500, `These entries couldn’t be decrypted, so nothing was exported: ${failed.join(', ')}. Check VAULT_KEY / VAULT_KEY_PREVIOUS.`, 'export_failed')
+    const body = JSON.stringify({
+      encrypted: false,
+      collections: [...collections].map(([name, id]) => ({ id, organizationId: null, name, externalId: null })),
+      items,
+    }, null, 2)
+    return new Response(body, {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="302-hub-vault-for-bitwarden-${new Date().toISOString().slice(0, 10)}.json"`,
+        'Cache-Control': 'no-store',
+      },
+    })
+  }))
+
+  // After the import is checked: delete every entry, encrypted secrets included. The audit log
+  // (who revealed what, when) stays. Mentors only, and the request has to say so explicitly.
+  router.delete('/api/vault', authed(async (request, env, user) => {
+    requireRole(user, 'admin', 'Only mentors can empty the vault.')
+    const body = await readBody(request)
+    if (body.confirm !== 'DELETE ALL') throw badRequest('Send confirm: "DELETE ALL" to delete every vault entry.')
+    const res = await env.DB.prepare('DELETE FROM vault_entries').run()
+    await logActivity(env, request, user, { action: 'vault.delete_all', entity: 'vault', summary: `Deleted all ${res.meta.changes} vault entries (moved to a password manager)` })
+    return json({ deleted: res.meta.changes })
   }))
 
   // After setting VAULT_KEY_PREVIOUS = old key and VAULT_KEY = new key: re-seal everything under

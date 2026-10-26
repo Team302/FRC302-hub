@@ -2,8 +2,8 @@
 // shown for a short while, then dropped from memory. Copying clears the clipboard after 30s
 // if it still holds what we put there (best-effort: browsers only allow it while focused).
 import { useEffect, useRef, useState } from 'react'
-import { Copy, Eye, EyeOff, ExternalLink, History, KeyRound, Lock, Pencil, Plus, Search, ShieldCheck, Smartphone, Wand2 } from 'lucide-react'
-import { del, get, patch, post } from '../lib/api'
+import { ArrowRightLeft, Copy, Download, Eye, EyeOff, ExternalLink, History, KeyRound, Lock, Pencil, Plus, Search, ShieldCheck, Smartphone, Trash2, Wand2 } from 'lucide-react'
+import { api, del, downloadFile, get, patch, post } from '../lib/api'
 import { useSession } from '../context/Session'
 import { atLeast, VAULT_ACCESS } from '../lib/constants'
 import { fmtFull, parseServerTime, relative } from '../lib/format'
@@ -198,6 +198,61 @@ function AuditModal({ entry, onClose }) {
   )
 }
 
+// Mentors: export to Bitwarden, then (after checking the import) delete everything here.
+function MovePanel({ data, onEmptied }) {
+  const { error, success } = useToast()
+  const [confirm, confirmDialog] = useConfirm()
+  const [typed, setTyped] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  return (
+    <section className="card p-5 mb-5 space-y-4">
+      {confirmDialog}
+      <div className="flex items-start gap-3">
+        <ArrowRightLeft className="w-5 h-5 text-accent-600 shrink-0 mt-0.5" />
+        <div className="text-sm text-brand-gray-600 space-y-1.5">
+          <p className="font-medium text-brand-black">Moving to Bitwarden</p>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>Download the export and import it into your Bitwarden organization (Admin Console → Import data → Bitwarden (json)). Each subteam and role becomes a collection.</li>
+            <li>Give each collection to the right group in Bitwarden, and check a few logins work.</li>
+            <li>{data.moved_to ? 'PASSWORDS_URL is set: everyone else already sees the link to Bitwarden.' : 'Set PASSWORDS_URL in wrangler.toml to the organization’s vault link and deploy. Everyone else then sees that link instead of this page.'}</li>
+            <li>Delete everything here, and delete the downloaded file.</li>
+          </ol>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn-secondary btn-sm" onClick={async () => {
+          if (!(await confirm({ title: 'Download every password?', message: 'The file has every password and 2FA key in plain text. Import it straight away, then delete it (and empty the trash). The download is logged.', confirmLabel: 'Download' }))) return
+          try { await downloadFile('/api/vault/export/bitwarden', 'vault-for-bitwarden.json'); success('Export downloaded', 'Delete the file once it’s imported.') } catch (e) { error('Couldn’t export', e.message) }
+        }}><Download className="w-4 h-4" />Export for Bitwarden</button>
+      </div>
+      {data.moved_to && data.entries.length > 0 && (
+        <form className="flex flex-wrap items-center gap-2 pt-3 border-t border-brand-gray-200" onSubmit={async (e) => {
+          e.preventDefault()
+          setDeleting(true)
+          try { const r = await api('/vault', { method: 'DELETE', body: { confirm: 'DELETE ALL' } }); success(`Deleted ${r.deleted} entries`, 'The audit log of who opened what is kept.'); onEmptied() } catch (err) { error('Couldn’t delete', err.message) } finally { setDeleting(false) }
+        }}>
+          <label className="text-sm text-brand-gray-600" htmlFor="del-all">Type <b className="text-brand-black">DELETE ALL</b> once the import is checked:</label>
+          <input id="del-all" className="input py-1.5 w-36" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
+          <button className="btn-danger btn-sm" disabled={typed !== 'DELETE ALL' || deleting}><Trash2 className="w-4 h-4" />Delete everything here</button>
+        </form>
+      )}
+    </section>
+  )
+}
+
+function MovedNotice({ url, mentor }) {
+  return (
+    <div className="card p-6 mb-5 flex flex-wrap items-center gap-4">
+      <KeyRound className="w-6 h-6 text-accent-600 shrink-0" />
+      <div className="flex-1 min-w-[220px]">
+        <p className="font-semibold">The team’s passwords are in Bitwarden now</p>
+        <p className="text-sm text-brand-gray-600 mt-0.5">{mentor ? 'This page is read-only and only mentors can see it, so you can check the import.' : 'Sign in to Bitwarden to see the logins for your subteam. No account yet? Ask a mentor to invite you.'}</p>
+      </div>
+      <a href={url} target="_blank" rel="noopener noreferrer" className="btn-primary"><ExternalLink className="w-4 h-4" />Open Bitwarden</a>
+    </div>
+  )
+}
+
 export default function Vault() {
   const { user, users, subteamById } = useSession()
   const [data, setData] = useState(null)
@@ -214,10 +269,17 @@ export default function Vault() {
     setEditing(null)
   }
 
+  const mentor = atLeast(user, 'admin')
+  if (data.moved_to && !mentor) {
+    return <div className="animate-fade-up"><PageHeader title="Passwords" subtitle="Shared team logins." /><MovedNotice url={data.moved_to} /></div>
+  }
+
   return (
     <div className="animate-fade-up">
-      <PageHeader title="Vault" subtitle="Shared team logins. Every password reveal is recorded."
-        actions={atLeast(user, 'lead') && data.configured && <button className="btn-primary" onClick={() => setEditing('new')}><Plus className="w-4 h-4" />Add login</button>} />
+      <PageHeader title={data.moved_to ? 'Passwords' : 'Vault'} subtitle="Shared team logins. Every password reveal is recorded."
+        actions={atLeast(user, 'lead') && data.configured && !data.moved_to && <button className="btn-primary" onClick={() => setEditing('new')}><Plus className="w-4 h-4" />Add login</button>} />
+      {data.moved_to && <MovedNotice url={data.moved_to} mentor />}
+      {mentor && data.configured && (data.moved_to ? data.entries.length > 0 : true) && <MovePanel data={data} onEmptied={() => setData((d) => ({ ...d, entries: [] }))} />}
 
       <div className="card flex items-start gap-3 px-5 py-3.5 mb-5">
         <ShieldCheck className="w-5 h-5 text-accent-600 shrink-0 mt-0.5" />
@@ -256,7 +318,7 @@ export default function Vault() {
                       </div>
                       <div className="flex">
                         {atLeast(user, 'admin') && <button className="btn-icon" onClick={() => setAudit(e)} aria-label="Access log" title="Access log"><History className="w-4 h-4" /></button>}
-                        {e.can_edit && <button className="btn-icon" onClick={() => setEditing(e)} aria-label="Edit" title="Edit"><Pencil className="w-4 h-4" /></button>}
+                        {e.can_edit && !data.moved_to && <button className="btn-icon" onClick={() => setEditing(e)} aria-label="Edit" title="Edit"><Pencil className="w-4 h-4" /></button>}
                       </div>
                     </header>
                     {e.username && (

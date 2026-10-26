@@ -213,6 +213,28 @@ Members can't see other people's emails. If your district has a data-privacy agr
   background; needs Pillow). The head crop is set for the current artwork, so check the output if the artwork changes.
   The brand colours are in `frontend/tailwind.config.js` (`ACCENT`, `FLAME`).
 
+## Passwords: use Bitwarden
+
+The hub's own vault works, but it isn't the right place for the team's real passwords: the server holds the key and
+decrypts on request, it has had no independent security audit, and there's no browser autofill. A dedicated,
+open-source, audited password manager does this properly. Recommended: **Bitwarden**, hosted by Bitwarden (nothing for
+the team to run or patch; it encrypts on each person's device). Self-hosting **Vaultwarden** also works, but it needs
+its own server with storage. It can't run on Cloudflare Workers, and someone has to keep it updated and backed up.
+
+Moving over:
+1. Create a Bitwarden organization for the team. Make a **group** per subteam (plus Leads and Mentors) and invite people.
+2. In the hub, as a mentor: **Passwords → Export for Bitwarden**. The file has every password in plain text; the
+   download is logged.
+3. Bitwarden Admin Console → **Import data** → format **Bitwarden (json)**. Each entry lands in collections named
+   after its subteams and role (e.g. *Mechanical*, *Programming (leads)*, *Everyone*, *Leads*, *Mentors*). Give each
+   collection to the matching group, and check a few logins.
+4. Set `PASSWORDS_URL` in `wrangler.toml` to the organization's vault link and deploy. Everyone except mentors now sees
+   "Passwords are in Bitwarden" with that link; the hub vault becomes read-only and mentor-only.
+5. Once the import is checked: **Delete everything here** on the same page (type DELETE ALL), then delete the export
+   file and empty the computer's trash. The audit log of who opened what is kept.
+6. Change the passwords that matter most (FIRST dashboard, social accounts) after the move. Anyone who could reveal
+   them in the hub may still have them.
+
 ## Local development
 
 Requires Node 22.13+.

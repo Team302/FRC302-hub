@@ -76,7 +76,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen = false, onClo
         <GroupLabel collapsed={collapsed}>Team</GroupLabel>
         <NavRow to="/season" icon={Trophy} label="Season" collapsed={collapsed} onNavigate={onClose} />
         <NavRow to="/meetings" icon={CalendarDays} label="Meetings" collapsed={collapsed} onNavigate={onClose} />
-        <NavRow to="/vault" icon={KeyRound} label="Vault" collapsed={collapsed} onNavigate={onClose} />
+        <NavRow to="/vault" icon={KeyRound} label="Passwords" collapsed={collapsed} onNavigate={onClose} />
         <NavRow to="/expenses" icon={Receipt} label="Expenses" collapsed={collapsed} onNavigate={onClose} />
         <NavRow to="/equipment" icon={Wrench} label="Equipment" collapsed={collapsed} onNavigate={onClose} />
         <NavRow to="/team" icon={Users} label="People" collapsed={collapsed} onNavigate={onClose} />

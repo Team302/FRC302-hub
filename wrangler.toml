@@ -32,6 +32,9 @@ ENVIRONMENT = "production"
 TEAM_NAME = "FRC Team 302"
 # Used for The Blue Alliance lookups (frc302).
 TEAM_NUMBER = "302"
+# Where the team's passwords live (e.g. your Bitwarden organization's vault URL). Once set, the
+# hub's own vault is read-only and only mentors can open it, to export it; see README → Passwords.
+PASSWORDS_URL = ""
 # The deployed app's origin (e.g. https://hub.team302.org). Clerk tokens minted on any other
 # origin are refused.
 APP_URL = ""
