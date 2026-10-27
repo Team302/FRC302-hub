@@ -32,7 +32,7 @@ ENVIRONMENT = "production"
 TEAM_NAME = "FRC Team 302"
 # Used for The Blue Alliance lookups (frc302).
 TEAM_NUMBER = "302"
-# Where the team's passwords live: your Vaultwarden web vault (https). The Passwords page links
+# Where the team's shared logins live: the password server's address (https). The Passwords page links
 # there; see README → Passwords.
 PASSWORDS_URL = ""
 # The deployed app's origin (e.g. https://hub.team302.org). Clerk tokens minted on any other

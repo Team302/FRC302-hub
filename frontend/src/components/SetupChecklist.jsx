@@ -24,7 +24,7 @@ export default function SetupChecklist({ upcomingMeetings }) {
     { done: boards.length > 0, label: 'Create your first board', hint: 'Start from the Robot build or Parts & purchasing template.', action: () => openNew('board') },
     { done: upcomingMeetings > 0, label: 'Schedule meetings', hint: 'A weekly series with the same agenda takes one form.', action: () => openNew('meeting') },
     { done: counts.events > 0, label: 'Add the season’s events', hint: 'Kickoff, competitions and deadlines get a countdown on everyone’s Home.', to: '/season' },
-    { done: counts.vault > 0, label: 'Set up the team’s password manager', hint: 'Vaultwarden with a collection per subteam, then PASSWORDS_URL (README → Passwords).', to: '/passwords' },
+    { done: counts.vault > 0, label: 'Set up the team’s password manager', hint: 'The password server on Workers with a collection per subteam, then PASSWORDS_URL (deploy/passwords/README.md).', to: '/passwords' },
     { done: counts.push > 0, label: 'Turn on notifications on your phone', hint: 'Inbox → Turn on. Ask students to do the same.', to: '/inbox' },
   ]
   const doneCount = steps.filter((s) => s.done).length

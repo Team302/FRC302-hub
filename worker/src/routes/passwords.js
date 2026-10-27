@@ -1,4 +1,4 @@
-// Team passwords live in a dedicated password manager (Vaultwarden, or Bitwarden), not in the hub:
+// Team passwords live in a Bitwarden-compatible server on a second Worker (deploy/passwords/), not in the hub:
 // README → Passwords. The hub only knows where it is, so the Passwords page can link to it.
 import { json } from '../lib/http.js'
 

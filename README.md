@@ -117,8 +117,8 @@ attendance, decisions, and action items that are created as real tasks on a boar
 *Recap:* a Markdown summary to paste into Slack, Discord or email, or print.
 
 **Passwords.** The hub doesn't store passwords. Team logins (Onshape, the FIRST dashboard, social accounts, shop
-Wi-Fi) live in **Vaultwarden**, a free, open-source, self-hosted server for the Bitwarden apps, with a collection per
-subteam. The Passwords page links there and shows how to set up the app. See [Passwords](#passwords-vaultwarden).
+Wi-Fi) live in a Bitwarden-compatible server on a second Worker (most important logins stay with mentors). The Passwords
+page links there and shows how to set up the app. See [Passwords](#passwords).
 
 **Backup** (mentors). Audit log → Download backup: boards, tasks, values, updates, history, meetings, attendance, events,
 the roster, expenses, equipment and the audit log as one JSON file. Push subscriptions and calendar links are **not**
@@ -154,8 +154,8 @@ Roles are re-read from the database on **every request**, so removing someone or
 ### Passwords
 The hub has no password vault. An earlier version had one, encrypted with a key the server held, so anyone who
 controlled the Cloudflare account could have read every secret. That isn't good enough for the team's real logins, so
-it was removed in favour of Vaultwarden, where passwords are encrypted on each person's device with their own master
-password. The tables were dropped (migration 0013); past "revealed a password" lines stay in the audit log.
+it was removed in favour of a Bitwarden-compatible server, where passwords are encrypted on each person's device with
+their own master password. The tables were dropped (migration 0013); past "revealed a password" lines stay in the audit log.
 
 ### Sign-in
 - Production uses **Clerk**. The session token is verified inside the Worker: RS256 is pinned, the issuer is derived from the
@@ -193,19 +193,21 @@ Members can't see other people's emails. If your district has a data-privacy agr
   background; needs Pillow). The head crop is set for the current artwork, so check the output if the artwork changes.
   The brand colours are in `frontend/tailwind.config.js` (`ACCENT`, `FLAME`).
 
-## Passwords: Vaultwarden
+## Passwords
 
-Team passwords live in **Vaultwarden**: free, open source, works with the official Bitwarden apps and browser
-extensions (autofill included), and encrypts on each person's device so the server can't read anything. Organizations
-and collections are free, so each subteam gets its own collection.
+Team passwords don't live in the hub. Three places, by how much is at stake:
 
-It can't run on Cloudflare Workers (it needs a server with storage), so it runs on any always-on computer: an old PC or
-a Raspberry Pi at school or a mentor's house, or a free cloud VM. A free **Cloudflare Tunnel** puts it online at a
-subdomain like `vault.team302.org` with HTTPS and no open ports. Everything is in [`deploy/vaultwarden/`](deploy/vaultwarden/):
-a pinned Docker Compose setup, a backup script and step-by-step instructions (about 30 minutes).
+- **Money and identity** (FIRST dashboard, bank/booster club): mentors only, in their own free personal Bitwarden
+  accounts (the free plan includes a 2-person organization for two mentors to share these).
+- **Services with individual accounts** (Onshape education, GitHub organization, Meta Business Suite): everyone gets their
+  own account; nothing shared.
+- **Truly shared, lower-stakes logins** (shop Wi-Fi, vendor accounts): **warden-worker**, an open-source,
+  Bitwarden-compatible server running as a second Worker on the same free Cloudflare account, with a collection per
+  subteam. The official Bitwarden apps encrypt everything on each person's device; the server only stores encrypted data.
+  It's a small, unaudited community project, which is why the important logins stay out of it.
 
-Once it's running, set `PASSWORDS_URL` in `wrangler.toml` to its address and deploy; the hub's Passwords page links to
-it. The honest cost: it's a server the team now runs. One mentor has to own monthly updates and backups.
+Setup, the reviewed version, backups and the review findings: [`deploy/passwords/`](deploy/passwords/). Once it's
+deployed, set `PASSWORDS_URL` in `wrangler.toml` to its address; the hub's Passwords page links there.
 
 ## Local development
 

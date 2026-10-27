@@ -9,6 +9,6 @@ VAPID_PRIVATE_KEY=
 # The Blue Alliance (optional): a free read key from https://www.thebluealliance.com/account
 # turns on Season → Import from TBA and live rank / next match on Home during competitions.
 TBA_API_KEY=
-# Where the team's passwords live: your Vaultwarden (or Bitwarden) web vault, https only.
+# Where the team's shared logins live: the password server's address (deploy/passwords/), https only.
 # The Passwords page links there (README → Passwords).
 PASSWORDS_URL=

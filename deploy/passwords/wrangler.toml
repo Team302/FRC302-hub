@@ -1,0 +1,84 @@
+# Team 302's password server: warden-worker (a Bitwarden-compatible server for Cloudflare Workers),
+# The-Stepping-Stones-Group fork, reviewed at commit b83786f. Copy this file over the fork's own
+# wrangler.toml (which points at the fork owner's database and domain). See README.md here.
+name = "team302-passwords"
+main = "src/entry.js"
+compatibility_date = "2025-09-19"
+keep_vars = true
+preview_urls = false
+
+# Address: the free workers.dev one works without a domain. The fork recommends a custom domain
+# (it reports occasional 1101 errors on workers.dev); if the team has a domain on Cloudflare, use
+# the [[routes]] block below instead and set workers_dev = false.
+workers_dev = true
+# [[routes]]
+# pattern = "passwords.team302.org"
+# custom_domain = true
+
+[placement]
+mode = "smart"
+
+# CPU-heavy work (login, import, password checks) runs in Durable Objects, which the Workers free
+# plan includes.
+[durable_objects]
+bindings = [
+  { name = "HEAVY_DO", class_name = "HeavyDo" },
+  { name = "NOTIFY_DO", class_name = "NotifyDo" }
+]
+
+[[migrations]]
+tag = "do_v1"
+new_sqlite_classes = ["HeavyDo"]
+
+[[migrations]]
+tag = "do_v2"
+new_sqlite_classes = ["NotifyDo"]
+
+[build]
+command = "cargo install --locked -q worker-build --version 0.8.5 && worker-build --release --locked"
+
+# 5 sign-in attempts a minute per email or IP.
+[[ratelimits]]
+name = "LOGIN_RATE_LIMITER"
+namespace_id = "3021"
+simple = { limit = 5, period = 60 }
+
+[[ratelimits]]
+name = "SEND_ACCESS_RATE_LIMITER"
+namespace_id = "3022"
+simple = { limit = 15, period = 60 }
+
+# The web vault (Vaultwarden's build of the Bitwarden web app), downloaded by the deploy workflow.
+[assets]
+directory = "./public/web-vault"
+binding = "ASSETS"
+not_found_handling = "404-page"
+html_handling = "auto-trailing-slash"
+run_worker_first = true
+
+[vars]
+# Deleted items are purged after 30 days.
+TRASH_AUTO_DELETE_DAYS = "30"
+
+[triggers]
+crons = ["0 3 * * *"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+# The deploy workflow replaces ${D1_DATABASE_ID} with the D1_DATABASE_ID GitHub secret.
+[[d1_databases]]
+binding = "vault1"
+database_name = "vault1"
+database_id = "${D1_DATABASE_ID}"
+migrations_dir = "migrations"
+
+# No attachments: no R2 bucket or KV namespace is bound, so file attachments and file Sends are
+# off. Logins, notes, 2FA codes and sharing don't need them.

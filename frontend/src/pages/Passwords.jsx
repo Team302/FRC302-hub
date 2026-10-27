@@ -1,5 +1,6 @@
-// Team passwords live in Vaultwarden (a self-hosted, Bitwarden-compatible password manager), not
-// in the hub. This page says where, and how to get in. README → Passwords has the setup.
+// Team passwords don't live in the hub. Shared logins are on a Bitwarden-compatible server (a second
+// Worker; deploy/passwords/); the most important ones stay with mentors. This page says where, and
+// how to get in.
 import { useEffect, useState } from 'react'
 import { ExternalLink, KeyRound, ShieldCheck } from 'lucide-react'
 import { get } from '../lib/api'
@@ -17,11 +18,11 @@ export default function Passwords() {
 
   return (
     <div className="animate-fade-up">
-      <PageHeader title="Passwords" subtitle="Shared team logins: Onshape, the FIRST dashboard, social accounts, shop Wi-Fi." />
+      <PageHeader title="Passwords" subtitle="Where the team’s logins live, and how to get to yours." />
       {!url ? (
         <div className="card">
           <EmptyState icon={KeyRound} title="The team password manager isn’t set up yet"
-            message={atLeast(user, 'admin') ? 'Set up Vaultwarden (README → Passwords), then set PASSWORDS_URL in wrangler.toml and deploy. This page will link to it.' : 'Until it is, ask a mentor for any login you need. Don’t share passwords in group chats.'} />
+            message={atLeast(user, 'admin') ? 'Set up the password server (deploy/passwords/README.md in the repo), then set PASSWORDS_URL in wrangler.toml and deploy. This page will link to it.' : 'Until it is, ask a mentor for any login you need. Don’t share passwords in group chats.'} />
         </div>
       ) : (
         <div className="space-y-5 max-w-3xl">
@@ -33,6 +34,14 @@ export default function Passwords() {
             </div>
             <a href={url} target="_blank" rel="noopener noreferrer" className="btn-primary"><ExternalLink className="w-4 h-4" />Open passwords</a>
           </div>
+          <section className="card p-6">
+            <h2 className="text-[15px] font-semibold mb-3">What’s in there, and what isn’t</h2>
+            <ul className="space-y-2 text-sm text-brand-gray-600">
+              <li><b className="text-brand-black">In the team password manager:</b> shared logins for your subteam, like the shop Wi-Fi, vendor accounts and tool licences.</li>
+              <li><b className="text-brand-black">Your own account instead:</b> Onshape, GitHub and the team’s social media give everyone their own login. Ask your lead to add you; don’t ask for a shared password.</li>
+              <li><b className="text-brand-black">Mentors only:</b> the FIRST dashboard, money and school accounts. If you need something done there, ask a mentor.</li>
+            </ul>
+          </section>
           <section className="card p-6">
             <h2 className="text-[15px] font-semibold mb-3">Use it on your phone and in your browser</h2>
             <ol className="list-decimal pl-5 space-y-2 text-sm text-brand-gray-600">
