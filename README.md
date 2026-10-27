@@ -74,6 +74,15 @@ again to pick up date or venue changes; a competition you'd already typed in is 
 event Home shows **rank, qual record, alliance, and the next and last match** with partners, opponents and the
 predicted start time, refreshed every minute. The team number is `TEAM_NUMBER` in `wrangler.toml`.
 
+**Trip rosters.** Any season event can have a sign-up list (Season → the event → Sign-up settings). Students sign
+themselves up or drop out until sign-up closes; with a **cap**, later sign-ups join a **waitlist** and the first in
+line is moved up, and told, when a place opens. The cap counts students; mentors on the list are chaperones and don't
+take a place. Each trip has a **checklist** (permission slip, trip fee, medical and emergency form by default) that
+leads and mentors tick per person; items marked *mentor-only*, which is anything a parent signs or money, can only be
+ticked, changed or removed by a mentor. Everyone sees who's going; only the person and leads/mentors see their
+checklist and note. **Export CSV** for the school's trip paperwork. The hub records *that* a form is in, never the
+form: no medical details or emergency contacts.
+
 **Equipment.** Tools, laptops, robot spares and safety gear: what the team has, where it lives, its condition, and
 who has it. A row can be a bin of identical things ("4 of 6 available"). Members **borrow** for themselves and return
 their own; leads and mentors add and edit items, **lend** to anyone and record any return. Lending checks what's on the

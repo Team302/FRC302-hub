@@ -26,11 +26,16 @@ function fields(body, current = {}) {
 
 export function eventRoutes(router, authed) {
   // ?scope=upcoming (default: ends today or later) | all
-  router.get('/api/events', authed(async (request, env) => {
+  // Each event carries its roster counts and the caller's own place on it (routes/trips.js).
+  router.get('/api/events', authed(async (request, env, user) => {
     const all = new URL(request.url).searchParams.get('scope') === 'all'
     const { results } = await env.DB.prepare(
-      `SELECT * FROM events ${all ? '' : "WHERE ends_on >= date('now')"} ORDER BY starts_on LIMIT 200`
-    ).all()
+      `SELECT e.*,
+        (SELECT COUNT(*) FROM event_roster r JOIN users u ON u.id = r.user_id AND u.is_active = 1 AND u.role <> 'admin' WHERE r.event_id = e.id AND r.status = 'going') AS going_count,
+        (SELECT COUNT(*) FROM event_roster r JOIN users u ON u.id = r.user_id AND u.is_active = 1 WHERE r.event_id = e.id AND r.status = 'waitlist') AS waitlist_count,
+        (SELECT status FROM event_roster r WHERE r.event_id = e.id AND r.user_id = ?) AS my_status
+       FROM events e ${all ? '' : "WHERE e.ends_on >= date('now')"} ORDER BY e.starts_on LIMIT 200`
+    ).bind(user.id).all()
     return json({ events: results, tba: { configured: tbaConfigured(env), team: teamNumber(env) } })
   }))
 

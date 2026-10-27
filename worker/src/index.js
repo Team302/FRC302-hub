@@ -23,6 +23,7 @@ import { passwordRoutes } from './routes/passwords.js'
 import { pushRoutes } from './routes/push.js'
 import { reportRoutes } from './routes/reports.js'
 import { teamRoutes } from './routes/team.js'
+import { tripRoutes } from './routes/trips.js'
 
 const SECURITY_HEADERS = {
   'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
@@ -52,6 +53,7 @@ export function buildRouter() {
   kioskRoutes(router, authed)
   expenseRoutes(router, authed)
   equipmentRoutes(router, authed)
+  tripRoutes(router, authed)
   router.get('/api/health', () => Response.json({ ok: true }))
   router.all('/api/*', () => { throw new HttpError(404, 'No such API route.', 'not_found') })
   return router

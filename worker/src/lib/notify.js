@@ -3,7 +3,7 @@
 // been removed from the team are never notified.
 import { pushConfigured, pushToUser } from './webpush.js'
 
-const PUSH_TITLE = { assigned: 'Assigned to you', mentioned: 'You were mentioned', update: 'New update', status: 'Status changed', due: 'Due soon', automation: 'Automation', review: 'Review', expense: 'Expense', equipment: 'Equipment' }
+const PUSH_TITLE = { assigned: 'Assigned to you', mentioned: 'You were mentioned', update: 'New update', status: 'Status changed', due: 'Due soon', automation: 'Automation', review: 'Review', expense: 'Expense', equipment: 'Equipment', trip: 'Trip' }
 
 // `url` is where a push opens when the notification isn't about a task (e.g. '/equipment').
 export async function notify(env, { userIds, actorId = null, kind, itemId = null, body, url = null }) {

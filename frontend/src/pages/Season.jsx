@@ -1,6 +1,7 @@
 // The season at a glance: kickoff, competitions, deadlines and outreach days, with countdowns.
 import { useEffect, useState } from 'react'
-import { CalendarRange, CloudDownload, ExternalLink, MapPin, Pencil, Plus, Trash2, Trophy } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { CalendarRange, CloudDownload, ExternalLink, MapPin, Pencil, Plus, Trash2, Trophy, Users } from 'lucide-react'
 import { del, get, patch, post } from '../lib/api'
 import { useSession } from '../context/Session'
 import { useToast } from '../context/ToastContext'
@@ -158,6 +159,13 @@ export default function Season() {
                     <span className="flex items-center gap-1"><CalendarRange className="w-3.5 h-3.5 text-brand-gray-400" />{range(e)}</span>
                     {e.location && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-brand-gray-400" />{e.location}</span>}
                     {e.url && <a href={e.url} target="_blank" rel="noopener noreferrer" className="link inline-flex items-center gap-1">Details<ExternalLink className="w-3 h-3" /></a>}
+                    {(e.roster_open || e.going_count > 0 || e.waitlist_count > 0 || e.my_status || canManage) && (
+                      <Link to={`/season/${e.id}`} className="link inline-flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" />
+                        {e.going_count || e.waitlist_count ? `${e.going_count}${e.capacity ? `/${e.capacity}` : ''} going${e.waitlist_count ? `, ${e.waitlist_count} waiting` : ''}` : e.roster_open ? 'Sign up' : 'Trip roster'}
+                      </Link>
+                    )}
+                    {e.my_status && <span className={e.my_status === 'going' ? 'badge-success' : 'badge-warning'}>{e.my_status === 'going' ? 'You’re going' : 'You’re on the waitlist'}</span>}
                   </p>
                   {e.notes && <p className="text-sm text-brand-gray-600 mt-1 whitespace-pre-wrap">{e.notes}</p>}
                 </div>
