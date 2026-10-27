@@ -20,6 +20,7 @@ import Inbox from './pages/Inbox'
 import Attendance from './pages/Attendance'
 import Season from './pages/Season'
 import Trip from './pages/Trip'
+import Guide from './pages/Guide'
 import Workload from './pages/Workload'
 import Kiosk from './pages/Kiosk'
 import Expenses from './pages/Expenses'
@@ -67,6 +68,7 @@ function SignedIn() {
           <Route path="activity" element={<RoleOnly role="admin"><Activity /></RoleOnly>} />
           <Route path="season" element={<Season />} />
           <Route path="season/:id" element={<Trip />} />
+          <Route path="guide" element={<Guide />} />
           <Route path="expenses" element={<Expenses />} />
           <Route path="equipment" element={<Equipment />} />
           <Route path="workload" element={<RoleOnly role="lead"><Workload /></RoleOnly>} />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertOctagon, CalendarDays, CheckCircle2, Clock, LayoutGrid, ListChecks, Radio, Trophy } from 'lucide-react'
+import { AlertOctagon, BookOpen, CalendarDays, CheckCircle2, Clock, LayoutGrid, ListChecks, Radio, Trophy } from 'lucide-react'
 import { get } from '../lib/api'
 import { useSession } from '../context/Session'
 import { atLeast, MEETING_KIND, STATUS, SWATCH } from '../lib/constants'
@@ -21,6 +21,22 @@ export function DueText({ due, done }) {
   if (!info) return <span className="text-brand-gray-400">—</span>
   const cls = { overdue: 'text-status-danger font-medium', soon: 'text-amber-700 font-medium', muted: 'text-brand-gray-400', normal: 'text-brand-gray-600' }[info.tone]
   return <span className={`whitespace-nowrap tabular-nums ${cls}`}>{info.label}</span>
+}
+
+// A pointer to the guide until it's dismissed on this device.
+const GUIDE_KEY = 'hub302.guideSeen'
+function GuideNudge() {
+  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(GUIDE_KEY) === '1' } catch { return false } })
+  if (hidden) return null
+  const dismiss = () => { setHidden(true); try { localStorage.setItem(GUIDE_KEY, '1') } catch { /* private mode */ } }
+  return (
+    <div className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 mb-6">
+      <BookOpen className="w-4 h-4 text-accent-600" />
+      <span className="flex-1 min-w-[200px] text-sm"><span className="font-medium">New here?</span> <span className="text-brand-gray-500">A few minutes on the guide covers check-in, your tasks, trips and getting notifications on your phone.</span></span>
+      <Link to="/guide" onClick={dismiss} className="btn-secondary btn-sm">Read the guide</Link>
+      <button type="button" className="btn-ghost btn-sm" onClick={dismiss}>Dismiss</button>
+    </div>
+  )
 }
 
 export default function Home() {
@@ -69,6 +85,7 @@ export default function Home() {
         </Link>
       )}
 
+      <GuideNudge />
       {data && atLeast(user, 'admin') && <SetupChecklist upcomingMeetings={data.meetings.length} />}
 
       {!data ? <div className="card"><SkeletonTable rows={6} cols={4} /></div> : (

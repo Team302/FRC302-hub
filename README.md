@@ -134,6 +134,10 @@ the roster, expenses, equipment and the audit log as one JSON file. Push subscri
 in it; file attachments are listed but not included. Every download is in the audit log.
 There is no restore-from-backup button yet; it's a copy for safekeeping and for moving data elsewhere.
 
+**Guide** (sidebar → Guide). How to use the hub, with a tab each for students, leads and mentors (it opens on yours),
+short steps that name the actual buttons, a link to each page, and common questions. Home shows a "New here?" card
+until it's dismissed on that device. Update `frontend/src/pages/Guide.jsx` when a button label changes.
+
 **Setup checklist.** Mentors get a short checklist on Home (add people, first board, meetings, events, password
 manager, notifications) that ticks itself off.
 

@@ -2,7 +2,7 @@
 // pane: favorites first, then every other active board.
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { BarChart3, CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Clock, Home, Trophy, Inbox, KeyRound, LayoutGrid, ListChecks, Plus, Receipt, ScrollText, Star, Users, Wrench, X } from 'lucide-react'
+import { BarChart3, BookOpen, CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Clock, Home, Trophy, Inbox, KeyRound, LayoutGrid, ListChecks, Plus, Receipt, ScrollText, Star, Users, Wrench, X } from 'lucide-react'
 import { useSession } from '../../context/Session'
 import { atLeast, ROLE, SWATCH } from '../../lib/constants'
 import { useIsDesktop } from '../detail/detailUtils'
@@ -83,6 +83,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen = false, onClo
         {atLeast(user, 'lead') && <NavRow to="/workload" icon={BarChart3} label="Workload" collapsed={collapsed} onNavigate={onClose} />}
         {atLeast(user, 'lead') && <NavRow to="/attendance" icon={Clock} label="Attendance" collapsed={collapsed} onNavigate={onClose} />}
         {atLeast(user, 'admin') && <NavRow to="/activity" icon={ScrollText} label="Audit log" collapsed={collapsed} onNavigate={onClose} />}
+        <NavRow to="/guide" icon={BookOpen} label="Guide" collapsed={collapsed} onNavigate={onClose} />
 
         <GroupLabel collapsed={collapsed} action={(
           <span className="flex items-center gap-0.5">
