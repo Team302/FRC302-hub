@@ -286,3 +286,58 @@ export function tripRoutes(router, authed) {
     return csvResponse(rows, `${event.name} roster.csv`)
   }))
 }
+
+// Someone left the team or became a mentor: their student place on upcoming trips is free, so
+// fill it from the waitlist.
+export async function refreshRostersFor(env, userId) {
+  const { results } = await env.DB.prepare(
+    "SELECT e.* FROM events e JOIN event_roster r ON r.event_id = e.id WHERE r.user_id = ? AND e.ends_on >= date('now')"
+  ).bind(userId).all()
+  for (const event of results) await promoteWaitlist(env, event)
+}
+
+export const TRIP_REMINDER_DAYS = 7
+
+// From the hourly job: once per trip, when it's a week (or less) away, everyone going who still
+// has checklist items open is told which, and the mentors get one summary.
+export async function sendTripReminders(env, now = new Date()) {
+  const day = (offset) => new Date(now.getTime() + offset * 86400000).toISOString().slice(0, 10)
+  const { results: events } = await env.DB.prepare(
+    `SELECT * FROM events WHERE trip_reminded_at IS NULL AND starts_on > ? AND starts_on <= ?
+       AND EXISTS (SELECT 1 FROM event_roster r WHERE r.event_id = events.id) LIMIT 50`
+  ).bind(day(0), day(TRIP_REMINDER_DAYS)).all()
+  let sent = 0
+  for (const event of events) {
+    // Claim it first, so an overlapping run can't send it twice.
+    const claimed = await env.DB.prepare("UPDATE events SET trip_reminded_at = datetime('now') WHERE id = ? AND trip_reminded_at IS NULL").bind(event.id).run()
+    if (!claimed.meta?.changes) continue
+    const { results: requirements } = await env.DB.prepare('SELECT id, label FROM event_requirements WHERE event_id = ? ORDER BY position, rowid').bind(event.id).all()
+    if (!requirements.length) continue
+    const { results: people } = await env.DB.prepare(
+      `SELECT r.user_id, u.name FROM event_roster r JOIN users u ON u.id = r.user_id AND u.is_active = 1 AND u.role <> 'admin'
+        WHERE r.event_id = ? AND r.status = 'going'`
+    ).bind(event.id).all()
+    const { results: checks } = await env.DB.prepare(
+      'SELECT c.user_id, c.requirement_id FROM event_checks c JOIN event_requirements q ON q.id = c.requirement_id WHERE q.event_id = ?'
+    ).bind(event.id).all()
+    const done = new Set(checks.map((c) => `${c.user_id}:${c.requirement_id}`))
+    const days = Math.round((Date.parse(`${event.starts_on}T00:00:00Z`) - Date.parse(`${day(0)}T00:00:00Z`)) / 86400000)
+    const when = days === 1 ? 'tomorrow' : `in ${days} days`
+    const missingCount = {}
+    let behind = 0
+    for (const p of people) {
+      const missing = requirements.filter((q) => !done.has(`${p.user_id}:${q.id}`))
+      if (!missing.length) continue
+      behind++
+      for (const q of missing) missingCount[q.label] = (missingCount[q.label] || 0) + 1
+      await notify(env, { userIds: [p.user_id], kind: 'trip', body: `${event.name} is ${when}. Still to do: ${missing.map((q) => q.label).join(', ')}.`, url: `/season/${event.id}` })
+      sent++
+    }
+    if (behind) {
+      const { results: mentors } = await env.DB.prepare("SELECT id FROM users WHERE role = 'admin' AND is_active = 1").all()
+      const detail = Object.entries(missingCount).map(([label, n]) => `${n} × ${label}`).join(', ')
+      await notify(env, { userIds: mentors.map((m) => m.id), kind: 'trip', body: `${event.name} is ${when}: ${behind} of ${people.length} going still have items open (${detail}).`, url: `/season/${event.id}` })
+    }
+  }
+  return sent
+}

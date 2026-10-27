@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { makeTeam } from './harness.mjs'
-import { selfServiceOpen } from '../src/routes/trips.js'
+import { selfServiceOpen, sendTripReminders } from '../src/routes/trips.js'
 
 const isoDay = (offset) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10)
 const notes = (app, who) => app.sql('SELECT kind, body FROM notifications WHERE user_id = ? ORDER BY id', app.users[who].id)
@@ -165,4 +165,55 @@ test('mentors chaperone: always going, not counted against the cap; a lead signi
   await app.call('alex', 'DELETE', `/api/events/${event.id}/roster/${app.users.alex.id}`)
   assert.equal((await app.call('lead', 'GET', `/api/events/${event.id}/roster`)).data.me.status, 'going')
   assert.equal((await app.call('lead', 'GET', '/api/events')).data.events.find((e) => e.id === event.id).going_count, 1)
+})
+
+test('removing someone from the team (or making them a mentor) moves the waitlist up', async () => {
+  const app = await makeTeam()
+  const { event } = await trip(app, { capacity: 1 })
+  await app.call('alex', 'POST', `/api/events/${event.id}/roster`, {})
+  await app.call('sam', 'POST', `/api/events/${event.id}/roster`, {})
+  assert.equal((await app.call('mentor', 'PATCH', `/api/users/${app.users.alex.id}`, { is_active: false })).status, 200)
+  assert.equal((await app.call('sam', 'GET', `/api/events/${event.id}/roster`)).data.me.status, 'going')
+  assert.match(notes(app, 'sam').at(-1).body, /A place opened up/)
+
+  const t2 = (await app.call('lead', 'POST', '/api/events', { name: 'Troy', starts_on: isoDay(30) })).data.event
+  await app.call('lead', 'PATCH', `/api/events/${t2.id}/roster`, { roster_open: true, capacity: 1 })
+  await app.call('lead', 'POST', `/api/events/${t2.id}/roster`, {})
+  await app.call('sam', 'POST', `/api/events/${t2.id}/roster`, {})
+  await app.call('mentor', 'PATCH', `/api/users/${app.users.lead.id}`, { role: 'admin' })
+  assert.equal((await app.call('sam', 'GET', `/api/events/${t2.id}/roster`)).data.me.status, 'going', 'a new mentor stops counting')
+})
+
+test('week-before reminder: once per trip, to people with items open, plus a summary for mentors', async () => {
+  const app = await makeTeam()
+  const event = (await app.call('lead', 'POST', '/api/events', { name: 'Lake City', starts_on: isoDay(6) })).data.event
+  const v = (await app.call('lead', 'PATCH', `/api/events/${event.id}/roster`, { roster_open: true })).data
+  await app.call('alex', 'POST', `/api/events/${event.id}/roster`, {})
+  await app.call('sam', 'POST', `/api/events/${event.id}/roster`, {})
+  await app.call('mentor', 'POST', `/api/events/${event.id}/roster`, {})
+  for (const q of v.requirements) await app.call('mentor', 'PUT', `/api/events/${event.id}/checks`, { requirement_id: q.id, user_id: app.users.sam.id, done: true })
+  await app.call('mentor', 'PUT', `/api/events/${event.id}/checks`, { requirement_id: v.requirements[0].id, user_id: app.users.alex.id, done: true })
+  // A trip further out isn't reminded yet.
+  const later = (await app.call('lead', 'POST', '/api/events', { name: 'States', starts_on: isoDay(20) })).data.event
+  await app.call('lead', 'PATCH', `/api/events/${later.id}/roster`, { roster_open: true })
+  await app.call('alex', 'POST', `/api/events/${later.id}/roster`, {})
+
+  const before = { alex: notes(app, 'alex').length, sam: notes(app, 'sam').length, mentor: notes(app, 'mentor').length }
+  assert.equal(await sendTripReminders(app.env), 1)
+  assert.equal(await sendTripReminders(app.env), 0, 'only once')
+  const alex = notes(app, 'alex').slice(before.alex)
+  assert.equal(alex.length, 1)
+  assert.match(alex[0].body, /Lake City is in 6 days\. Still to do: Trip fee paid, Medical & emergency form\./)
+  assert.equal(notes(app, 'sam').length, before.sam, 'all done: nothing to say')
+  const m = notes(app, 'mentor').slice(before.mentor)
+  assert.equal(m.length, 1)
+  assert.match(m[0].body, /1 of 2 going still have items open \(1 × Trip fee paid, 1 × Medical & emergency form\)/)
+})
+
+test('moving an event can’t leave sign-up closing after it ends', async () => {
+  const app = await makeTeam()
+  const { event } = await trip(app, { signup_closes_on: isoDay(19) })
+  const res = await app.call('lead', 'PATCH', `/api/events/${event.id}`, { starts_on: isoDay(10), ends_on: isoDay(11) })
+  assert.equal(res.status, 400)
+  assert.match(res.data.error, /Sign-up settings/)
 })

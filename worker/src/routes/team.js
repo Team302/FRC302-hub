@@ -5,6 +5,7 @@ import { atLeast, requireRole, ROLES } from '../lib/auth.js'
 import { logActivity } from '../lib/activity.js'
 import { badRequest, conflict, forbidden, json, newId, notFound, readBody } from '../lib/http.js'
 import * as v from '../lib/validate.js'
+import { refreshRostersFor } from './trips.js'
 
 const COLORS = ['gray', 'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'teal', 'cyan', 'blue', 'indigo', 'violet', 'pink']
 export { COLORS }
@@ -98,6 +99,8 @@ export function teamRoutes(router, authed) {
         env.DB.prepare('UPDATE users SET calendar_token_hash = NULL WHERE id = ?').bind(target.id),
       ])
     }
+    // A student place on a trip may have opened up (they left, or they're a mentor now).
+    if (isActive === false || (role !== undefined && role !== target.role)) await refreshRostersFor(env, target.id)
     const changes = [role && role !== target.role && `role ${target.role} → ${role}`, isActive === false && 'removed', isActive === true && !target.is_active && 'reactivated'].filter(Boolean)
     await logActivity(env, request, user, { action: 'user.update', entity: 'user', entityId: target.id, summary: `${target.name}: ${changes.join(', ') || 'details changed'}` })
     const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(target.id).first()

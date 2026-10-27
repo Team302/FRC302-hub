@@ -81,7 +81,9 @@ take a place. Each trip has a **checklist** (permission slip, trip fee, medical 
 leads and mentors tick per person; items marked *mentor-only*, which is anything a parent signs or money, can only be
 ticked, changed or removed by a mentor. Everyone sees who's going; only the person and leads/mentors see their
 checklist and note. **Export CSV** for the school's trip paperwork. The hub records *that* a form is in, never the
-form: no medical details or emergency contacts.
+form: no medical details or emergency contacts. A week before the trip (once), everyone going with items still open is
+told which, and the mentors get one summary. Removing someone from the team, or making them a mentor, moves the
+waitlist up.
 
 **Equipment.** Tools, laptops, robot spares and safety gear: what the team has, where it lives, its condition, and
 who has it. A row can be a bin of identical things ("4 of 6 available"). Members **borrow** for themselves and return

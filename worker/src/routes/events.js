@@ -91,6 +91,7 @@ export function eventRoutes(router, authed) {
     const current = await env.DB.prepare('SELECT * FROM events WHERE id = ?').bind(request.params.id).first()
     if (!current) throw notFound('That event')
     const f = fields(await readBody(request), current)
+    if (current.signup_closes_on && current.signup_closes_on > f.ends_on) throw badRequest(`Trip sign-up closes ${current.signup_closes_on}, after the new end date. Change it in Sign-up settings first.`)
     await env.DB.prepare('UPDATE events SET name = ?, kind = ?, starts_on = ?, ends_on = ?, location = ?, url = ?, notes = ? WHERE id = ?')
       .bind(f.name, f.kind, f.starts_on, f.ends_on, f.location, f.url, f.notes, current.id).run()
     return json({ event: { ...current, ...f } })

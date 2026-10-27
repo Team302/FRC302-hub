@@ -23,7 +23,7 @@ import { passwordRoutes } from './routes/passwords.js'
 import { pushRoutes } from './routes/push.js'
 import { reportRoutes } from './routes/reports.js'
 import { teamRoutes } from './routes/team.js'
-import { tripRoutes } from './routes/trips.js'
+import { sendTripReminders, tripRoutes } from './routes/trips.js'
 
 const SECURITY_HEADERS = {
   'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
@@ -88,12 +88,13 @@ export async function handle(request, env, ctx) {
 export default {
   fetch: handle,
   // Hourly (wrangler.toml [triggers]): due-date and review reminders (once per task per day), overdue
-  // equipment reminders (once per loan per day) and emptying
+  // equipment reminders (once per loan per day), the week-before trip reminder (once per trip) and emptying
   // trash older than TRASH_DAYS. One failing doesn't stop the other.
   scheduled: (_controller, env, ctx) => ctx.waitUntil(Promise.allSettled([
     sendDueReminders({ ...env, waitUntil: (p) => ctx.waitUntil(p) }),
     sendReviewReminders({ ...env, waitUntil: (p) => ctx.waitUntil(p) }),
     sendEquipmentReminders({ ...env, waitUntil: (p) => ctx.waitUntil(p) }),
+    sendTripReminders({ ...env, waitUntil: (p) => ctx.waitUntil(p) }),
     purgeTrash(env),
   ]).then((rs) => rs.forEach((r) => r.status === 'rejected' && console.error('[cron]', r.reason)))),
 }
