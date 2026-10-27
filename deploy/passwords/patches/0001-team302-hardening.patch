@@ -1,0 +1,140 @@
+From 62fb7495be6a56f4b8ef0b6adbb8b0c03608df2d Mon Sep 17 00:00:00 2001
+From: Team 302 <code@zeraministries.org>
+Date: Tue, 27 Oct 2026 01:21:10 +0000
+Subject: [PATCH] Team 302 hardening: keep org items on account delete, block
+ last-owner delete, confirm only accepted members, restrict org creation
+
+---
+ src/handlers/accounts.rs      | 35 ++++++++++++++++++++++++++++++
+ src/handlers/organizations.rs | 41 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 76 insertions(+)
+
+diff --git a/src/handlers/accounts.rs b/src/handlers/accounts.rs
+index 6642848..2562e90 100644
+--- a/src/handlers/accounts.rs
++++ b/src/handlers/accounts.rs
+@@ -707,6 +707,30 @@ pub async fn delete_account(
+         return Err(AppError::Unauthorized("Invalid password".to_string()));
+     }
+ 
++    // Team 302 patch: don't leave an organization without a confirmed owner.
++    let sole_owner: Option<f64> = db
++        .prepare(
++            "SELECT COUNT(1) AS count FROM users_organizations uo \
++             WHERE uo.user_id = ?1 AND uo.status = ?2 AND uo.type = ?3 \
++               AND (SELECT COUNT(1) FROM users_organizations o \
++                    WHERE o.organization_id = uo.organization_id \
++                      AND o.status = ?2 AND o.type = ?3) = 1",
++        )
++        .bind(&[
++            user_id.clone().into(),
++            crate::models::organization::ORG_USER_STATUS_CONFIRMED.into(),
++            crate::models::organization::ORG_USER_TYPE_OWNER.into(),
++        ])?
++        .first(Some("count"))
++        .await
++        .map_err(|_| AppError::Database)?;
++    if sole_owner.unwrap_or(0.0) > 0.0 {
++        return Err(AppError::BadRequest(
++            "You are the only owner of an organization. Make someone else an owner first."
++                .to_string(),
++        ));
++    }
++
+     push::unregister_push_devices_by_user(&env, user_id).await;
+ 
+     if attachments::attachments_enabled(env.as_ref()) {
+@@ -728,6 +752,17 @@ pub async fn delete_account(
+     .run()
+     .await?;
+ 
++    // Team 302 patch: ciphers.user_id cascades on user delete, which would take the
++    // organization ciphers this user created with it. Detach them first.
++    d1_query!(
++        &db,
++        "UPDATE ciphers SET user_id = NULL WHERE user_id = ?1 AND organization_id IS NOT NULL",
++        user_id
++    )
++    .map_err(|_| AppError::Database)?
++    .run()
++    .await?;
++
+     d1_query!(
+         &db,
+         "DELETE FROM users_collections WHERE user_id = ?1",
+diff --git a/src/handlers/organizations.rs b/src/handlers/organizations.rs
+index 4a86084..12ac91b 100644
+--- a/src/handlers/organizations.rs
++++ b/src/handlers/organizations.rs
+@@ -1186,6 +1186,34 @@ fn ids_from_public_keys_payload(payload: &Value) -> Vec<String> {
+     ids.into_iter().collect()
+ }
+ 
++// Team 302 patch: only the emails listed in ORG_CREATION_EMAILS (comma-separated, exact
++// match) may create organizations. Unset means nobody can.
++async fn ensure_may_create_organization(env: &Env, db: &Db, user_id: &str) -> Result<(), AppError> {
++    let allowed = env
++        .secret("ORG_CREATION_EMAILS")
++        .map(|v| v.to_string())
++        .or_else(|_| env.var("ORG_CREATION_EMAILS").map(|v| v.to_string()))
++        .unwrap_or_default();
++    let email: Option<String> = db
++        .prepare("SELECT email FROM users WHERE id = ?1")
++        .bind(&[user_id.into()])?
++        .first(Some("email"))
++        .await
++        .map_err(|_| AppError::Database)?;
++    let email = email.unwrap_or_default().trim().to_ascii_lowercase();
++    let ok = !email.is_empty()
++        && allowed
++            .split(',')
++            .any(|e| e.trim().to_ascii_lowercase() == email);
++    if ok {
++        Ok(())
++    } else {
++        Err(AppError::Forbidden(
++            "Creating organizations is turned off on this server".to_string(),
++        ))
++    }
++}
++
+ #[worker::send]
+ pub async fn create_organization(
+     claims: Claims,
+@@ -1193,6 +1221,7 @@ pub async fn create_organization(
+     Json(payload): Json<CreateOrganizationRequest>,
+ ) -> Result<Json<Value>, AppError> {
+     let db = db::get_db(&env)?;
++    ensure_may_create_organization(&env, &db, &claims.sub).await?;
+     let now = db::now_string();
+     let org_id = Uuid::new_v4().to_string();
+     let member_id = Uuid::new_v4().to_string();
+@@ -1832,6 +1861,12 @@ pub async fn confirm_org_user(
+             "Organization user is already confirmed".to_string(),
+         ));
+     }
++    // Team 302 patch: only confirm someone who has accepted the invite.
++    if target.status != ORG_USER_STATUS_ACCEPTED {
++        return Err(AppError::BadRequest(
++            "Organization user has not accepted the invite".to_string(),
++        ));
++    }
+     let now = db::now_string();
+ 
+     d1_query!(
+@@ -1886,6 +1921,12 @@ pub async fn confirm_org_users(
+                 "Organization user is already confirmed".to_string(),
+             ));
+         }
++        // Team 302 patch: only confirm someone who has accepted the invite.
++        if target.status != ORG_USER_STATUS_ACCEPTED {
++            return Err(AppError::BadRequest(
++                "Organization user has not accepted the invite".to_string(),
++            ));
++        }
+     }
+ 
+     let now = db::now_string();
+-- 
+2.43.0
+

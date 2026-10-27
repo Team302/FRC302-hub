@@ -30,7 +30,7 @@ export default function Passwords() {
             <KeyRound className="w-6 h-6 text-accent-600 shrink-0" />
             <div className="flex-1 min-w-[220px]">
               <p className="font-semibold">The team’s passwords are in the team password manager</p>
-              <p className="text-sm text-brand-gray-600 mt-0.5">You see the logins for your subteam. No account yet? Ask a mentor to invite you.</p>
+              <p className="text-sm text-brand-gray-600 mt-0.5">You see the logins for your subteam. No account yet? Ask a mentor; you’ll set it up together at a meeting.</p>
             </div>
             <a href={url} target="_blank" rel="noopener noreferrer" className="btn-primary"><ExternalLink className="w-4 h-4" />Open passwords</a>
           </div>
@@ -47,7 +47,7 @@ export default function Passwords() {
             <ol className="list-decimal pl-5 space-y-2 text-sm text-brand-gray-600">
               <li>Install the free <b className="text-brand-black">Bitwarden</b> app (App Store or Google Play) or browser extension. It works with the team’s server.</li>
               <li>On the sign-in screen, choose <b className="text-brand-black">Self-hosted</b> (under “Logging in on”) and enter <code className="px-1.5 py-0.5 rounded bg-brand-gray-100 text-brand-black text-[13px]">{host}</code></li>
-              <li>Sign in with the email and master password you set when you accepted the invite.</li>
+              <li>Sign in with the email and master password you chose when you made your account.</li>
             </ol>
             <p className="flex items-start gap-2 text-xs text-brand-gray-500 mt-4">
               <ShieldCheck className="w-4 h-4 shrink-0 text-accent-600" />
