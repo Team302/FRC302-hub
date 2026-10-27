@@ -21,6 +21,7 @@ import Attendance from './pages/Attendance'
 import Season from './pages/Season'
 import Trip from './pages/Trip'
 import Guide from './pages/Guide'
+import Welcome from './pages/Welcome'
 import Workload from './pages/Workload'
 import Kiosk from './pages/Kiosk'
 import Expenses from './pages/Expenses'
@@ -43,6 +44,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Routes>
           {/* The shop kiosk has no sign-in: its URL is its credential. */}
           <Route path="kiosk/:token" element={<Kiosk />} />
+          {/* Printable welcome for new students and families, before they have an account. Static. */}
+          <Route path="welcome" element={<Welcome />} />
           <Route path="*" element={<SignedIn />} />
         </Routes>
       </BrowserRouter>

@@ -9,64 +9,71 @@ import {
 } from 'lucide-react'
 import { useSession } from '../context/Session'
 import FilterChips from '../components/ui/FilterChips'
+import PushToggle from '../components/PushToggle'
 import PageHeader from '../components/ui/PageHeader'
 
 const B = ({ children }) => <b className="text-brand-black font-medium">{children}</b>
+// A label the reader will see in the app (button, page, field). worker/test/guide.test.mjs checks
+// each one still exists somewhere in the frontend, so renaming a button fails the tests until the
+// guide is updated.
+const Btn = B
 
 const GUIDES = {
   member: [
     {
       icon: Smartphone, title: 'Day one: put it on your phone', to: '/inbox', go: 'Inbox',
+      extra: <div className="mt-4"><p className="text-xs text-brand-gray-500 mb-2">The same switch as in Inbox, for the device you’re on now:</p><PushToggle /></div>,
       steps: [
         <>iPhone: open the hub in <B>Safari</B> → Share → <B>Add to Home Screen</B>. Android: Chrome menu → <B>Install app</B>.</>,
-        <>Open it from the Home Screen icon, go to <B>Inbox</B> and press <B>Turn on</B> to get notifications on this phone. On iPhone this only works from the Home Screen icon, not from Safari.</>,
-        <>Want meetings and your due dates in your own calendar? Your initial (top right) → <B>Calendar feed</B>. The link is private; don’t share it.</>,
+        <>Open it from the Home Screen icon, go to <Btn>Inbox</Btn> and press <Btn>Turn on</Btn> to get notifications on this phone. On iPhone this only works from the Home Screen icon, not from Safari.</>,
+        <>Want meetings and your due dates in your own calendar? Your initial (top right) → <Btn>Calendar feed</Btn>. The link is private; don’t share it.</>,
       ],
     },
     {
       icon: ListChecks, title: 'Your tasks', to: '/my-work', go: 'My work',
       steps: [
-        <><B>My work</B> lists everything you own across all boards: overdue first, then today and the next 7 days.</>,
+        <><Btn>My work</Btn> lists everything you own across all boards: overdue first, then today and the next 7 days.</>,
         <>Click a task to open it. Change its <B>status</B> as you go (Working on it, Stuck, Done). Stuck tells people you need help; say why in an update.</>,
         <>Post <B>updates</B> on the task instead of in a group chat, and type <B>@</B> and a name to bring someone in. Drag photos, PDFs or CAD exports onto the task to attach them.</>,
-        <>If your task has a reviewer, press <B>Submit for review</B> when you’re done. They’ll approve it or ask for changes with a note. Some boards only let the reviewer, a lead or a mentor mark things Done.</>,
+        <>If your task has a reviewer, press <Btn>Submit for review</Btn> when you’re done. They’ll approve it or ask for changes with a note. Some boards only let the reviewer, a lead or a mentor mark things Done.</>,
       ],
     },
     {
       icon: CalendarDays, title: 'Meetings and your hours', to: '/meetings', go: 'Meetings',
+      extra: <KioskPicture />,
       steps: [
-        <>When you arrive, tap your name on the <B>shop tablet</B> by the door, or open the meeting on your phone and press <B>Check in</B>.</>,
-        <>Leaving early? Tap your name again on the tablet, or press <B>Leaving early? Check out</B>. Your hours count from check-in to check-out.</>,
-        <>Your hours so far are on <B>Home</B>. They’re what counts for lettering and travel, so check in every time.</>,
+        <>When you arrive, tap your name on the <B>shop tablet</B> by the door, or open the meeting on your phone and press <Btn>Check in</Btn>.</>,
+        <>Leaving early? Tap your name again on the tablet, or press <Btn>Leaving early? Check out</Btn>. Your hours count from check-in to check-out.</>,
+        <>Your hours so far are on <Btn>Home</Btn>. They’re what counts for lettering and travel, so check in every time.</>,
       ],
     },
     {
       icon: Trophy, title: 'Competitions and trips', to: '/season', go: 'Season',
       steps: [
-        <><B>Season</B> has kickoff, competitions, deadlines and outreach days with a countdown. During a competition, Home shows our rank and next match.</>,
-        <>When sign-up opens for a trip, open the event and press <B>I’m going</B>. If it’s full you join the waitlist and get a notification when a place opens up.</>,
+        <><Btn>Season</Btn> has kickoff, competitions, deadlines and outreach days with a countdown. During a competition, Home shows our rank and next match.</>,
+        <>When sign-up opens for a trip, open the event and press <Btn>I’m going</Btn>. If it’s full you join the waitlist and get a notification when a place opens up.</>,
         <>Your checklist (permission slip, fee, forms) is on the same page. A mentor ticks those when they have them; hand the paper forms to a mentor, not the hub.</>,
-        <>Can’t go after all? Press <B>Drop out</B> before sign-up closes so the next person gets your place. After that, tell a mentor.</>,
+        <>Can’t go after all? Press <Btn>Drop out</Btn> before sign-up closes so the next person gets your place. After that, tell a mentor.</>,
       ],
     },
     {
       icon: Wrench, title: 'Borrowing equipment', to: '/equipment', go: 'Equipment',
       steps: [
-        <>Taking a drill, laptop or spare home or to another room? Find it in <B>Equipment</B> and press <B>Borrow</B>.</>,
-        <><B>Return</B> it in the hub when you put it back, and say if it came back damaged. What you have out is at the top of the page under <B>You’re holding</B>.</>,
+        <>Taking a drill, laptop or spare home or to another room? Find it in <Btn>Equipment</Btn> and press <Btn>Borrow</Btn>.</>,
+        <><Btn>Return</Btn> it in the hub when you put it back, and say if it came back damaged. What you have out is at the top of the page under <Btn>You’re holding</Btn>.</>,
       ],
     },
     {
       icon: Receipt, title: 'Spent money for the team?', to: '/expenses', go: 'Expenses',
       steps: [
-        <><B>Expenses</B> → <B>New expense</B>: amount, vendor, category, and a photo of the receipt. Say whether it was your own money so you get paid back.</>,
+        <><Btn>Expenses</Btn> → <Btn>New expense</Btn>: amount, vendor, category, and a photo of the receipt. Say whether it was your own money so you get paid back.</>,
         <>A mentor approves or declines it (you’ll see why), then marks it paid back. Ask before you buy, not after.</>,
       ],
     },
     {
       icon: KeyRound, title: 'Logins', to: '/passwords', go: 'Passwords',
       steps: [
-        <>The hub doesn’t store passwords. <B>Passwords</B> shows where the team’s shared logins are and how to get to your subteam’s.</>,
+        <>The hub doesn’t store passwords. <Btn>Passwords</Btn> shows where the team’s shared logins are and how to get to your subteam’s.</>,
         <>Never paste a team password into a group chat or a task update.</>,
       ],
     },
@@ -77,45 +84,45 @@ const GUIDES = {
       steps: [
         <>Sidebar → <B>+</B> next to Boards → pick a template (Robot build, Parts & purchasing, Competition prep, Outreach) and set its subteam.</>,
         <>Use <B>groups</B> for phases or subsystems, and add <B>columns</B> for what you track (est. hours, vendor, CAD link). Keep it small; every column is something people have to fill in.</>,
-        <>Give tasks one <B>Owner</B> and a due date. Set a <B>Reviewer</B> on work that needs checking (a group can have a default reviewer), and turn on <B>Done needs approval</B> in board Settings if you want it enforced.</>,
-        <><B>Automations</B> save chasing: “when Stuck, notify a mentor”, “when Done, move to Testing”.</>,
+        <>Give tasks one <Btn>Owner</Btn> and a due date. Set a <Btn>Reviewer</Btn> on work that needs checking (a group can have a default reviewer), and turn on <Btn>Done needs approval</Btn> in board Settings if you want it enforced.</>,
+        <><Btn>Automations</Btn> save chasing: “when Stuck, notify a mentor”, “when Done, move to Testing”.</>,
       ],
     },
     {
       icon: CalendarDays, title: 'Run a meeting', to: '/meetings', go: 'Meetings',
       steps: [
-        <><B>Schedule meeting</B>, weekly if it repeats. Build the agenda: topics with an owner and minutes. It warns when the agenda is longer than the meeting.</>,
-        <>Press <B>Start</B> at the start. Go topic by topic with the timer, take notes, record decisions, and add <B>action items</B>: they become real tasks on a board.</>,
+        <><Btn>Schedule meeting</Btn>, weekly if it repeats. Build the agenda: topics with an owner and minutes. It warns when the agenda is longer than the meeting.</>,
+        <>Press <Btn>Start</Btn> at the start. Go topic by topic with the timer, take notes, record decisions, and add <B>action items</B>: they become real tasks on a board.</>,
         <>Attendance is one click per person, or let people check in on the kiosk. At the end, copy the <B>recap</B> into Discord or email.</>,
       ],
     },
     {
       icon: MonitorSmartphone, title: 'The shop tablet', to: '/meetings', go: 'Meetings',
       steps: [
-        <><B>Meetings</B> → <B>Shop kiosk</B> → <B>Set up kiosk</B>, and open the link it gives you on the tablet by the door. It isn’t signed in as anyone and can only list names and record check-ins.</>,
+        <><Btn>Meetings</Btn> → <Btn>Shop kiosk</Btn> → <Btn>Set up kiosk</Btn>, and open the link it gives you on the tablet by the door. It isn’t signed in as anyone and can only list names and record check-ins.</>,
         <>It shows check-in only while a meeting is running. Turn the link off if the tablet goes missing.</>,
       ],
     },
     {
       icon: Users, title: 'Keep an eye on the team', to: '/workload', go: 'Workload',
       steps: [
-        <><B>Workload</B>: open, overdue and stuck tasks per person, and who has nothing. Reviews waiting on someone show there too.</>,
-        <><B>Attendance</B>: hours and attendance rate per person for any date range; export it for lettering or travel eligibility.</>,
+        <><Btn>Workload</Btn>: open, overdue and stuck tasks per person, and who has nothing. Reviews waiting on someone show there too.</>,
+        <><Btn>Attendance</Btn>: hours and attendance rate per person for any date range; export it for lettering or travel eligibility.</>,
       ],
     },
     {
       icon: Trophy, title: 'Trips', to: '/season', go: 'Season',
       steps: [
-        <>Open an event → <B>Sign-up settings</B>: open sign-up, set the number of student places and the last day to sign up.</>,
+        <>Open an event → <Btn>Sign-up settings</Btn>: open sign-up, set the number of student places and the last day to sign up.</>,
         <>You can add anyone (even past the cap), move people up from the waitlist, and add and tick checklist items like “safety glasses packed”. Permission slips, fees and medical forms are ticked by mentors.</>,
-        <><B>Export CSV</B> gives the school or the bus company the list.</>,
+        <><Btn>Export CSV</Btn> gives the school or the bus company the list.</>,
       ],
     },
     {
       icon: Wrench, title: 'Equipment', to: '/equipment', go: 'Equipment',
       steps: [
         <>Add tools, laptops and spares with where they live. A bin of identical things is one row with a quantity.</>,
-        <><B>Lend</B> to anyone and record any return. People get a reminder when they’re overdue; anything that comes back broken tells leads and mentors.</>,
+        <><Btn>Lend</Btn> to anyone and record any return. People get a reminder when they’re overdue; anything that comes back broken tells leads and mentors.</>,
       ],
     },
   ],
@@ -123,9 +130,10 @@ const GUIDES = {
     {
       icon: ClipboardCheck, title: 'First week', to: '/', go: 'Home',
       steps: [
-        <><B>Home</B> has a setup checklist that ticks itself off: add people, first board, meetings, season events, the password manager, notifications.</>,
-        <><B>People</B>: add everyone by email and set their role and subteam. <B>Lead</B> is for student leads; <B>Mentor</B> sees everything, including mentor meetings and the audit log. Use at least two mentors.</>,
-        <>With a Blue Alliance key set up, <B>Season</B> → <B>Import from TBA</B> adds every event the team is registered for.</>,
+        <>Send new students and their families the <Link to="/welcome" className="link">one-page welcome</Link> ({window.location.host}/welcome). It works before they have an account and prints on one sheet.</>,
+        <><Btn>Home</Btn> has a setup checklist that ticks itself off: add people, first board, meetings, season events, the password manager, notifications.</>,
+        <><Btn>People</Btn>: add everyone by email and set their role and subteam. <B>Lead</B> is for student leads; <B>Mentor</B> sees everything, including mentor meetings and the audit log. Use at least two mentors.</>,
+        <>With a Blue Alliance key set up, <Btn>Season</Btn> → <Btn>Import from TBA</Btn> adds every event the team is registered for.</>,
       ],
     },
     {
@@ -145,8 +153,8 @@ const GUIDES = {
     {
       icon: ShieldCheck, title: 'Looking after the hub', to: '/activity', go: 'Audit log',
       steps: [
-        <><B>Audit log</B> shows who did what. <B>Download backup</B> there at the end of each season and before big changes; keep it somewhere safe, it has names and emails.</>,
-        <>When someone leaves: <B>People</B> → their name → <B>Remove from team</B> (it takes effect on their next click; reassign their tasks), remove them from the password manager, and change any shared password they could see.</>,
+        <><Btn>Audit log</Btn> shows who did what. <Btn>Download backup</Btn> there at the end of each season and before big changes; keep it somewhere safe, it has names and emails.</>,
+        <>When someone leaves: <Btn>People</Btn> → their name → <Btn>Remove from team</Btn> (it takes effect on their next click; reassign their tasks), remove them from the password manager, and change any shared password they could see.</>,
         <>Set up the team password manager from the repo’s <code className="text-[13px]">deploy/passwords/README.md</code>; keep money and identity logins in mentors’ own Bitwarden accounts.</>,
       ],
     },
@@ -164,6 +172,24 @@ const FAQ = [
 
 const ROLE_TABS = [{ key: 'member', label: 'Students' }, { key: 'lead', label: 'Leads' }, { key: 'admin', label: 'Mentors' }]
 
+// What the shop tablet looks like: find your name, tap it, confirm.
+function KioskPicture() {
+  return (
+    <figure className="mt-4" aria-label="The shop tablet: tap your name, then confirm">
+      <div className="rounded-2xl bg-brand-gray-100 p-3 grid grid-cols-3 gap-2 max-w-sm">
+        {[['AT', 'Ava T.', 'Here · tap to leave', true], ['EB', 'Ethan B.', '', false], ['LN', 'Liam N.', '', false]].map(([i, name, sub, on]) => (
+          <div key={name} className={`rounded-xl border p-2 flex flex-col items-center gap-1 text-center ${on ? 'border-accent-500/40 bg-accent-500/10' : 'border-brand-gray-200 bg-white'}`}>
+            <span className={`w-7 h-7 rounded-full grid place-items-center text-[10px] font-semibold ${on ? 'bg-accent-600 text-white' : 'bg-brand-gray-100 text-brand-gray-600'}`}>{i}</span>
+            <span className="text-xs font-medium leading-tight">{name}</span>
+            {sub && <span className="text-[10px] text-brand-gray-500 leading-tight">{sub}</span>}
+          </div>
+        ))}
+      </div>
+      <figcaption className="text-xs text-brand-gray-500 mt-1.5">The shop tablet. Tap your name, then <b>Check in</b> on the box that pops up; green means you’re here.</figcaption>
+    </figure>
+  )
+}
+
 function Section({ s, n }) {
   const Icon = s.icon
   return (
@@ -177,6 +203,7 @@ function Section({ s, n }) {
               <li key={i} className="flex gap-3"><span className="w-5 h-5 rounded-full bg-brand-gray-100 text-[11px] font-semibold text-brand-gray-600 grid place-items-center shrink-0 mt-px">{i + 1}</span><span className="min-w-0">{step}</span></li>
             ))}
           </ol>
+          {s.extra}
           <Link to={s.to} className="link inline-flex items-center gap-1 text-sm mt-4">Go to {s.go}<ArrowRight className="w-3.5 h-3.5" /></Link>
         </div>
       </div>

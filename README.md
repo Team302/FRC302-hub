@@ -138,7 +138,13 @@ There is no restore-from-backup button yet; it's a copy for safekeeping and for 
 
 **Guide** (sidebar → Guide). How to use the hub, with a tab each for students, leads and mentors (it opens on yours),
 short steps that name the actual buttons, a link to each page, and common questions. Home shows a "New here?" card
-until it's dismissed on that device. Update `frontend/src/pages/Guide.jsx` when a button label changes.
+until it's dismissed on that device. It includes the real notifications switch and a picture of the shop tablet.
+Buttons and pages the guide names are marked `<Btn>`; `worker/test/guide.test.mjs` fails if one no longer appears
+anywhere in the app, so a renamed button can't leave the guide quietly wrong.
+
+**Welcome page** (`/welcome`, no sign-in). A one-page welcome for new students and their families: how to get in,
+check-in, trips and paper forms, and what the hub stores. Static text, no data from the hub, always light, prints on
+one sheet. Send the link before people have accounts, or print it for kickoff.
 
 **Setup checklist.** Mentors get a short checklist on Home (add people, first board, meetings, events, password
 manager, notifications) that ticks itself off.
