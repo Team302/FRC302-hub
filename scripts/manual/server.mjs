@@ -11,17 +11,30 @@ export const BASE = `http://localhost:${PORT}`
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx'
 
 export async function startServer({ log = () => {} } = {}) {
+  if (await fetch(`${BASE}/api/auth/config`).then(() => true, () => false)) {
+    throw new Error(`Something is already running on port ${PORT} (an earlier manual build that didn't exit?). Stop it and try again.`)
+  }
   const state = mkdtempSync(join(tmpdir(), 'hub-manual-'))
   const migrate = spawnSync(npx, ['wrangler', 'd1', 'migrations', 'apply', 'frc302-hub-db', '--local', '--persist-to', state], { encoding: 'utf8', env: { ...process.env, CI: '1' } })
   if (migrate.status !== 0) throw new Error(`Migrations failed:\n${migrate.stdout}\n${migrate.stderr}`)
   // Dev login is local-only and needs these; .dev.vars supplies JWT_SECRET (run `npm run dev` once first).
   const child = spawn(npx, ['wrangler', 'dev', '--port', String(PORT), '--persist-to', state,
     '--var', 'ENVIRONMENT:development', '--var', 'DEV_LOGIN:on', '--var', 'BOOTSTRAP_ADMIN_EMAIL:coach@team302.org',
-    '--var', 'TBA_API_KEY:', '--var', 'PASSWORDS_URL:https://passwords.team302.org'], { stdio: ['ignore', 'pipe', 'pipe'] })
+    '--var', 'TBA_API_KEY:', '--var', 'PASSWORDS_URL:https://passwords.team302.org'], { stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' })
   let output = ''
   child.stdout.on('data', (d) => { output += d; log(String(d)) })
   child.stderr.on('data', (d) => { output += d; log(String(d)) })
-  const stop = () => { child.kill('SIGTERM'); try { rmSync(state, { recursive: true, force: true }) } catch { /* in use on Windows */ } }
+  // npx starts wrangler, which starts workerd: kill the whole process group, not just npx, or
+  // the server outlives the build and holds the port.
+  let stopped = false
+  const stop = () => {
+    if (stopped) return
+    stopped = true
+    try { process.platform === 'win32' ? child.kill('SIGTERM') : process.kill(-child.pid, 'SIGTERM') } catch { /* already gone */ }
+    try { rmSync(state, { recursive: true, force: true }) } catch { /* in use on Windows */ }
+  }
+  for (const sig of ['SIGINT', 'SIGTERM']) process.once(sig, () => { stop(); process.exit(130) })
+  process.once('exit', stop)
   for (let i = 0; i < 120; i++) {
     if (child.exitCode !== null) { stop(); throw new Error(`wrangler dev exited:\n${output.slice(-2000)}`) }
     try { if ((await fetch(`${BASE}/api/auth/config`)).ok) return { stop } } catch { /* not up yet */ }
