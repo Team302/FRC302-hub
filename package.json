@@ -10,6 +10,7 @@
     "predev": "node scripts/setup-dev.mjs",
     "dev": "concurrently --names worker,app --prefix-colors cyan,magenta \"wrangler dev --port 8787\" \"npm run dev --prefix frontend\"",
     "build": "npm run build --prefix frontend",
+    "docs:manual": "node scripts/manual/build.mjs",
     "test": "node --test --disable-warning=ExperimentalWarning \"worker/test/*.test.mjs\"",
     "db:migrate:local": "wrangler d1 migrations apply frc302-hub-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply frc302-hub-db --remote",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
+    "pagedjs": "^0.4.3",
     "wrangler": "^4.151.1"
   }
 }

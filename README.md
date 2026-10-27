@@ -230,6 +230,25 @@ Team passwords don't live in the hub. Three places, by how much is at stake:
 Setup, the reviewed version, backups and the review findings: [`deploy/passwords/`](deploy/passwords/). Once it's
 deployed, set `PASSWORDS_URL` in `wrangler.toml` to its address; the hub's Passwords page links there.
 
+## User manual
+
+[`docs/302-Hub-User-Manual.pdf`](docs/302-Hub-User-Manual.pdf) is the printable manual: a cover, contents with page
+numbers, a chapter per area (getting started, your work, boards and tasks, meetings and attendance, season and trips,
+equipment, expenses, people, lead and mentor tools, passwords) and appendices for permissions and troubleshooting.
+Every figure is a real screenshot of the app with numbered callouts explained underneath, and each section says who it
+is for (everyone, leads and mentors, or mentors only).
+
+It's generated, not drawn: `npm run docs:manual` starts a throwaway hub on port 8799 with its own empty database,
+fills it with the demo team plus trips, equipment and expenses (`scripts/manual/seed-extras.mjs`), takes every
+screenshot (`scripts/manual/shots.mjs`), lays the pages out with Paged.js and prints the PDF. Your normal dev database
+isn't touched. The text and the figures (which page, what to click first, which elements to number) live together in
+`scripts/manual/content.mjs`; a callout that no longer matches anything stops the build and names the figure, so a UI
+change can't leave a stale arrow. Rebuild after UI changes and commit the new PDF. It takes about ten minutes.
+
+Needs Playwright's Chromium (`npm i -D playwright && npx playwright install chromium`, or set
+`PLAYWRIGHT_CHROMIUM_PATH`) and a `.dev.vars` (run `npm run dev` once). `-- --no-build` skips the frontend build,
+`-- --only=board,panel` retakes just those screenshots, and `-- --keep` keeps the HTML for debugging the layout.
+
 ## Local development
 
 Requires Node 22.13+.

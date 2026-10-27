@@ -21,7 +21,9 @@
      Dark is the default theme; light is frosted white over a pale backdrop. */
   :root {
     --glass-fill: 255 255 255 / 0.62;
-    --glass-fill-strong: 255 255 255 / 0.82;
+    /* Floating layers stay nearly solid: a menu inside the (glass) top bar can't blur the page
+       under it in Chromium, because the bar is its backdrop root, so text would show through. */
+    --glass-fill-strong: 255 255 255 / 0.97;
     --glass-border: 15 15 15 / 0.08;
     --glass-highlight: 255 255 255 / 0.9;
     --glass-shadow: 0 1px 2px rgb(16 24 40 / 0.04), 0 8px 24px -12px rgb(16 24 40 / 0.12);
@@ -34,7 +36,7 @@
   }
   .dark {
     --glass-fill: 255 255 255 / 0.03;
-    --glass-fill-strong: 22 22 24 / 0.78;
+    --glass-fill-strong: 22 22 24 / 0.96;
     --glass-border: 255 255 255 / 0.09;
     --glass-highlight: 255 255 255 / 0.09;
     --glass-shadow: 0 1px 1px rgb(0 0 0 / 0.5), 0 16px 40px -16px rgb(0 0 0 / 0.8);

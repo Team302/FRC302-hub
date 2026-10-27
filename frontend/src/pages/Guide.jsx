@@ -33,7 +33,7 @@ const GUIDES = {
       icon: ListChecks, title: 'Your tasks', to: '/my-work', go: 'My work',
       steps: [
         <><Btn>My work</Btn> lists everything you own across all boards: overdue first, then today and the next 7 days.</>,
-        <>Click a task to open it. Change its <B>status</B> as you go (Working on it, Stuck, Done). Stuck tells people you need help; say why in an update.</>,
+        <>Open a task with the ⤢ button at the end of its name (point at the row to see it; on a phone, tap the card). Change its <B>status</B> as you go (Working on it, Stuck, Done). Stuck tells people you need help; say why in an update.</>,
         <>Post <B>updates</B> on the task instead of in a group chat, and type <B>@</B> and a name to bring someone in. Drag photos, PDFs or CAD exports onto the task to attach them.</>,
         <>If your task has a reviewer, press <Btn>Submit for review</Btn> when you’re done. They’ll approve it or ask for changes with a note. Some boards only let the reviewer, a lead or a mentor mark things Done.</>,
       ],
