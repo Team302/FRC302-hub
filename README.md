@@ -300,19 +300,12 @@ before it starts; to do it by hand, run `npm run db:migrate:local`.
    ```
 5. `npm run deploy` runs the tests, builds the app, migrates D1 and deploys.
 6. Sign in as the bootstrap mentor, then add everyone in **Team**. Each person signs in with Clerk using the email you entered.
-
-## Why a new app instead of forking ProjectPro
-
-ProjectPro is about 116k lines of field-service business software: invoicing, Stripe Connect, payroll, QuickBooks, a client
-portal and SMS. A robotics team would use maybe 5% of it, and would still inherit all of its complexity, attack surface and
-migrations. This repo keeps what carried over well:
-
+Layout
 - the Cloudflare Worker + D1 + Workers Assets deployment
 - the networkless Clerk verification
 - the AES-GCM field encryption, extended with key ids for rotation
 - the Tailwind design tokens and component styles
 
-Everything else is purpose-built. The result is a codebase a student programmer can read end to end.
 
 ## Layout
 
